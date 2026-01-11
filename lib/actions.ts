@@ -1,0 +1,132 @@
+'use server'
+
+import { supabase } from './supabase'
+import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
+
+export async function createLink(formData: FormData) {
+    const purpose = formData.get('purpose') as string
+    const location = formData.get('location') as string
+    const duration = parseInt(formData.get('duration') as string)
+    const date = formData.get('date') as string // "YYYY-MM-DDTHH:mm"
+
+    const attendeesRaw = formData.getAll('attendees') as string[]
+    const floppersRaw = formData.getAll('floppers') as string[]
+
+    // Insert Link
+    const { data: link, error: linkError } = await supabase
+        .from('links')
+        .insert({
+            purpose,
+            location_name: location,
+            duration_minutes: duration,
+            date: new Date(date).toISOString()
+        })
+        .select()
+        .single()
+
+    if (linkError) {
+        console.error('Error creating link:', linkError)
+        throw new Error('Failed to create link')
+    }
+
+    // Insert Members
+    const members: { link_id: string, profile_id: string, is_flop: boolean }[] = []
+
+    // Add attendees (is_flop = false)
+    attendeesRaw.forEach(id => {
+        members.push({
+            link_id: link.id,
+            profile_id: id,
+            is_flop: false
+        })
+    })
+
+    // Add floppers (is_flop = true)
+    floppersRaw.forEach(id => {
+        members.push({
+            link_id: link.id,
+            profile_id: id,
+            is_flop: true
+        })
+    })
+
+
+    if (members.length > 0) {
+        const { error: membersError } = await supabase
+            .from('link_members')
+            .insert(members)
+
+        if (membersError) {
+            console.error('Error adding members:', membersError)
+            // Cleanup link if members fail? Or just warn.
+        }
+    }
+
+    revalidatePath('/')
+    revalidatePath('/history')
+    redirect('/')
+}
+
+export async function updateLink(id: string, formData: FormData) {
+    const purpose = formData.get('purpose') as string
+    const location = formData.get('location') as string
+    const duration = parseInt(formData.get('duration') as string)
+    const date = formData.get('date') as string
+
+    const attendeesRaw = formData.getAll('attendees') as string[]
+    const floppersRaw = formData.getAll('floppers') as string[]
+
+    // Update Link
+    const { error: linkError } = await supabase
+        .from('links')
+        .update({
+            purpose,
+            location_name: location,
+            duration_minutes: duration,
+            date: new Date(date).toISOString()
+        })
+        .eq('id', id)
+
+    if (linkError) {
+        console.error('Error updating link:', linkError)
+        throw new Error('Failed to update link')
+    }
+
+    // Update members: Delete all and re-insert is easiest
+    const { error: deleteError } = await supabase
+        .from('link_members')
+        .delete()
+        .eq('link_id', id)
+
+    if (deleteError) {
+        console.error('Error clearing members for update:', deleteError)
+    }
+
+    const members: { link_id: string, profile_id: string, is_flop: boolean }[] = []
+    attendeesRaw.forEach(pid => members.push({ link_id: id, profile_id: pid, is_flop: false }))
+    floppersRaw.forEach(pid => members.push({ link_id: id, profile_id: pid, is_flop: true }))
+
+    if (members.length > 0) {
+        await supabase.from('link_members').insert(members)
+    }
+
+    revalidatePath('/')
+    revalidatePath('/history')
+    redirect('/history')
+}
+
+export async function deleteLink(id: string) {
+    const { error } = await supabase
+        .from('links')
+        .delete()
+        .eq('id', id)
+
+    if (error) {
+        console.error('Error deleting link:', error)
+        throw new Error('Failed to delete link')
+    }
+
+    revalidatePath('/')
+    revalidatePath('/history')
+}
