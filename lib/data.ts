@@ -44,13 +44,19 @@ export async function getDashboardStats() {
         .from('link_members')
         .select('is_flop, profile_id, profiles(name, is_active)')
 
-    if (linksError || membersError) {
-        console.error('Error fetching stats data', linksError, membersError)
+    const { count: activeFriendsCount, error: activeFriendsError } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true)
+
+    if (linksError || membersError || activeFriendsError) {
+        console.error('Error fetching stats data', linksError, membersError, activeFriendsError)
         return {
             totalLinks: 0,
             avgDuration: 0,
-            flopRate: 0,
-            topFlopper: 'N/A'
+            avgAttendance: 0,
+            topFlopper: 'N/A',
+            attendanceData: []
         }
     }
 
@@ -65,8 +71,15 @@ export async function getDashboardStats() {
     const activeMembersHistory = members.filter(m => m.profiles?.is_active !== false)
 
     const totalMembers = activeMembersHistory.length
-    const totalFlops = activeMembersHistory.filter(m => m.is_flop).length
-    const flopRate = totalMembers > 0 ? Math.round((totalFlops / totalMembers) * 100) : 0
+
+    // Calculate Average Attendance
+    // Formula: (Total Active Attendees / (Total Links * Total Active Friends)) * 100
+    const totalActiveAttendees = activeMembersHistory.filter(m => !m.is_flop).length
+    const totalPossibleAttendance = (totalLinks * (activeFriendsCount || 0))
+
+    const avgAttendance = totalPossibleAttendance > 0
+        ? Math.round((totalActiveAttendees / totalPossibleAttendance) * 100)
+        : 0
 
     // Calculate top flopper
     const flopsByPerson: Record<string, number> = {}
@@ -106,7 +119,7 @@ export async function getDashboardStats() {
     return {
         totalLinks,
         avgDuration,
-        flopRate,
+        avgAttendance,
         topFlopper,
         attendanceData
     }

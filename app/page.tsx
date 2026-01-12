@@ -3,10 +3,8 @@ import { Overview } from "@/components/overview";
 import { FlopWall } from "@/components/flop-wall";
 import { MemberStatus } from "@/components/member-status";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, Clock, Users, UserMinus, Plus } from "lucide-react";
-import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { LinkForm } from "@/components/link-form";
+import { Activity, Clock, Users, UserMinus } from "lucide-react";
+import { AddLinkDialog } from "@/components/add-link-dialog";
 
 export const revalidate = 0; // Ensure fresh data on every load
 
@@ -19,20 +17,11 @@ export default async function Home() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button className="bg-white text-black hover:bg-zinc-200">
-              <Plus className="mr-2 h-4 w-4" /> Add Link
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl border-zinc-800 bg-zinc-950 p-0 overflow-hidden">
-            <DialogTitle className="sr-only">Log a New Link</DialogTitle>
-            <div className="max-h-[90vh] overflow-y-auto">
-              <LinkForm friends={friends} />
-            </div>
-          </DialogContent>
-        </Dialog>
+        <h2 className="text-3xl font-bold tracking-tight">The Link Stats</h2>
+        <AddLinkDialog friends={friends} />
+      </div>
+      <div className="flex items-center justify-left">
+        A dashboard to show statistics about lads link ups. All data is from the start of 2026 onwards.
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -73,11 +62,11 @@ export default async function Home() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Flop Rate</CardTitle>
+            <CardTitle className="text-sm font-medium">Average Attendance</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.flopRate}%</div>
+            <div className="text-2xl font-bold">{stats.avgAttendance}%</div>
             <p className="text-xs text-muted-foreground">Overall attendance</p>
           </CardContent>
         </Card>
@@ -85,9 +74,9 @@ export default async function Home() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         {/* @ts-ignore */}
-        <Overview className="col-span-3" data={stats.attendanceData} />
+        <Overview className="col-span-3 h-128" data={stats.attendanceData} />
 
-        <div className="col-span-4">
+        <div className="col-span-4 h-128">
           <FlopWall friends={friends} allFlops={flops} />
         </div>
       </div>

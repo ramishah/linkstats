@@ -1,4 +1,4 @@
-import { getRecentLinks } from "@/lib/data" // Actually we might want a getAllLinks, but getRecentLinks is fine for now if limit is high or removed.
+import { getRecentLinks, getFriends } from "@/lib/data"
 import { supabase } from "@/lib/supabase"
 import { HistoryTable } from "@/components/history-table"
 
@@ -10,6 +10,7 @@ async function getAllLinks() {
       link_members (
         profile_id,
         is_flop,
+        flop_reason,
         profiles (name)
       )
     `)
@@ -26,11 +27,12 @@ export const revalidate = 0;
 
 export default async function HistoryPage() {
     const links = await getAllLinks()
+    const friends = await getFriends()
 
     return (
         <div className="flex flex-col gap-6">
             <h2 className="text-3xl font-bold tracking-tight">Link History</h2>
-            <HistoryTable links={links} />
+            <HistoryTable links={links} friends={friends} />
         </div>
     )
 }

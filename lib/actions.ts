@@ -66,7 +66,7 @@ export async function createLink(formData: FormData) {
 
     revalidatePath('/')
     revalidatePath('/history')
-    redirect('/')
+    return { success: true }
 }
 
 export async function updateLink(id: string, formData: FormData) {
@@ -117,7 +117,7 @@ export async function updateLink(id: string, formData: FormData) {
 
     revalidatePath('/')
     revalidatePath('/history')
-    redirect('/history')
+    return { success: true }
 }
 
 export async function deleteLink(id: string) {

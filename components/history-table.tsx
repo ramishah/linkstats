@@ -11,10 +11,10 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { Trash2, Pencil } from 'lucide-react'
-import Link from 'next/link'
+import { Trash2 } from 'lucide-react'
+import { EditLinkDialog } from '@/components/edit-link-dialog'
 
-export function HistoryTable({ links }: { links: any[] }) {
+export function HistoryTable({ links, friends }: { links: any[], friends: any[] }) {
     return (
         <div className="rounded-md border">
             <Table>
@@ -74,11 +74,7 @@ export function HistoryTable({ links }: { links: any[] }) {
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex justify-end gap-2">
-                                            <Link href={`/edit/${link.id}`}>
-                                                <Button variant="ghost" size="icon">
-                                                    <Pencil className="h-4 w-4" />
-                                                </Button>
-                                            </Link>
+                                            <EditLinkDialog link={link} friends={friends} />
                                             <Button
                                                 variant="ghost"
                                                 size="icon"

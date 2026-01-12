@@ -17,9 +17,10 @@ interface LinkFormProps {
     friends: any[]
     initialData?: any
     isEdit?: boolean
+    onSuccess?: () => void
 }
 
-export function LinkForm({ friends, initialData, isEdit = false }: LinkFormProps) {
+export function LinkForm({ friends, initialData, isEdit = false, onSuccess }: LinkFormProps) {
     // Parse initial members if editing
     const initialAttendees = new Set(
         initialData?.link_members
@@ -92,7 +93,12 @@ export function LinkForm({ friends, initialData, isEdit = false }: LinkFormProps
                 <CardTitle>{isEdit ? 'Edit Link' : 'Log a New Link'}</CardTitle>
             </CardHeader>
             <CardContent>
-                <form action={action} className="space-y-6">
+                <form action={async (formData) => {
+                    await action(formData)
+                    if (onSuccess) {
+                        onSuccess()
+                    }
+                }} className="space-y-6">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col gap-3">
                             <Label htmlFor="date-picker" className="px-1">
@@ -201,7 +207,7 @@ export function LinkForm({ friends, initialData, isEdit = false }: LinkFormProps
 
                     <div className="grid grid-cols-2 gap-8">
                         <div className="space-y-3">
-                            <Label className="text-base">Attendees (Who came)</Label>
+                            <Label className="text-base">Attendees</Label>
                             <div className="grid grid-cols-1 gap-2">
                                 {friends.map((friend) => (
                                     <div key={`attendee-${friend.id}`} className="flex items-center space-x-2">
@@ -222,7 +228,7 @@ export function LinkForm({ friends, initialData, isEdit = false }: LinkFormProps
                         </div>
 
                         <div className="space-y-3">
-                            <Label className="text-base text-red-500">Floppers (Who skipped)</Label>
+                            <Label className="text-base text-red-400">Floppers</Label>
                             <div className="grid grid-cols-1 gap-2">
                                 {friends.map((friend) => {
                                     const isChecked = selectedFloppers.has(friend.id);
