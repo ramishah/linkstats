@@ -31,7 +31,7 @@ export async function createLink(formData: FormData) {
     }
 
     // Insert Members
-    const members: { link_id: string, profile_id: string, is_flop: boolean, flop_reason?: string }[] = []
+    const members: { link_id: string, profile_id: string, is_flop: boolean, flop_reason?: string | null }[] = []
 
     // Add attendees (is_flop = false)
     attendeesRaw.forEach(id => {
@@ -104,7 +104,7 @@ export async function updateLink(id: string, formData: FormData) {
         console.error('Error clearing members for update:', deleteError)
     }
 
-    const members: { link_id: string, profile_id: string, is_flop: boolean, flop_reason?: string }[] = []
+    const members: { link_id: string, profile_id: string, is_flop: boolean, flop_reason?: string | null }[] = []
     attendeesRaw.forEach(pid => members.push({ link_id: id, profile_id: pid, is_flop: false }))
     floppersRaw.forEach(pid => {
         const reason = formData.get(`flop_reason_${pid}`) as string
