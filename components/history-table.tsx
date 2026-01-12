@@ -2,6 +2,7 @@
 
 import { deleteLink } from '@/lib/actions'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import {
     Table,
     TableBody,
@@ -36,22 +37,39 @@ export function HistoryTable({ links }: { links: any[] }) {
                         </TableRow>
                     ) : (
                         links.map((link) => {
-                            // Calculate members string
                             // @ts-ignore
-                            const attendees = link.link_members.filter(m => !m.is_flop).map(m => m.profiles.name).join(', ')
+                            const attendees = link.link_members.filter(m => !m.is_flop).map(m => m.profiles.name)
                             // @ts-ignore
-                            const floppers = link.link_members.filter(m => m.is_flop).map(m => m.profiles.name).join(', ')
+                            const floppers = link.link_members.filter(m => m.is_flop).map(m => m.profiles.name)
+
+                            const hours = Math.floor(link.duration_minutes / 60)
+                            const minutes = link.duration_minutes % 60
 
                             return (
                                 <TableRow key={link.id}>
                                     <TableCell>{new Date(link.date).toLocaleDateString()}</TableCell>
                                     <TableCell className="font-medium">{link.purpose}</TableCell>
                                     <TableCell>{link.location_name}</TableCell>
-                                    <TableCell>{link.duration_minutes}m</TableCell>
+                                    <TableCell>{hours}h {minutes}m</TableCell>
                                     <TableCell>
-                                        <div className="flex flex-col">
-                                            <span>{attendees}</span>
-                                            {floppers && <span className="text-red-500 text-xs text-muted-foreground">Flops: {floppers}</span>}
+                                        <div className="flex flex-col gap-2">
+                                            <div className="flex flex-wrap gap-1">
+                                                {attendees.map((name: string, i: number) => (
+                                                    <Badge key={i} variant="secondary" className="font-normal hover:bg-zinc-700">
+                                                        {name}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                            {floppers.length > 0 && (
+                                                <div className="flex flex-wrap gap-1 items-center">
+                                                    <span className="text-xs text-muted-foreground mr-1">Flops:</span>
+                                                    {floppers.map((name: string, i: number) => (
+                                                        <Badge key={i} variant="destructive" className="font-normal">
+                                                            {name}
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-right">

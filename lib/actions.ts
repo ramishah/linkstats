@@ -31,7 +31,7 @@ export async function createLink(formData: FormData) {
     }
 
     // Insert Members
-    const members: { link_id: string, profile_id: string, is_flop: boolean }[] = []
+    const members: { link_id: string, profile_id: string, is_flop: boolean, flop_reason?: string }[] = []
 
     // Add attendees (is_flop = false)
     attendeesRaw.forEach(id => {
@@ -44,13 +44,14 @@ export async function createLink(formData: FormData) {
 
     // Add floppers (is_flop = true)
     floppersRaw.forEach(id => {
+        const reason = formData.get(`flop_reason_${id}`) as string
         members.push({
             link_id: link.id,
             profile_id: id,
-            is_flop: true
+            is_flop: true,
+            flop_reason: reason || null
         })
     })
-
 
     if (members.length > 0) {
         const { error: membersError } = await supabase
@@ -103,9 +104,12 @@ export async function updateLink(id: string, formData: FormData) {
         console.error('Error clearing members for update:', deleteError)
     }
 
-    const members: { link_id: string, profile_id: string, is_flop: boolean }[] = []
+    const members: { link_id: string, profile_id: string, is_flop: boolean, flop_reason?: string }[] = []
     attendeesRaw.forEach(pid => members.push({ link_id: id, profile_id: pid, is_flop: false }))
-    floppersRaw.forEach(pid => members.push({ link_id: id, profile_id: pid, is_flop: true }))
+    floppersRaw.forEach(pid => {
+        const reason = formData.get(`flop_reason_${pid}`) as string
+        members.push({ link_id: id, profile_id: pid, is_flop: true, flop_reason: reason || null })
+    })
 
     if (members.length > 0) {
         await supabase.from('link_members').insert(members)

@@ -7,13 +7,14 @@ async function getLink(id: string) {
     const { data, error } = await supabase
         .from('links')
         .select(`
-      *,
-      link_members (
-        profile_id,
-        is_flop,
-        profiles (name)
-      )
-    `)
+            *,
+            link_members (
+                profile_id,
+                is_flop,
+                flop_reason,
+                profiles (name)
+            )
+        `)
         .eq('id', id)
         .single()
 
@@ -23,8 +24,13 @@ async function getLink(id: string) {
     return data
 }
 
-export default async function EditLinkPage({ params }: { params: { id: string } }) {
-    const link = await getLink(params.id)
+type Props = {
+    params: Promise<{ id: string }>
+}
+
+export default async function EditLinkPage({ params }: Props) {
+    const { id } = await params
+    const link = await getLink(id)
     const friends = await getFriends()
 
     if (!link) {

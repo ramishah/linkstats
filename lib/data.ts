@@ -3,7 +3,7 @@ import { supabase } from './supabase'
 export async function getFriends() {
     const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('*, is_active')
         .order('name')
 
     if (error) {
@@ -42,7 +42,7 @@ export async function getDashboardStats() {
 
     const { data: members, error: membersError } = await supabase
         .from('link_members')
-        .select('is_flop, profile_id, profiles(name)')
+        .select('is_flop, profile_id, profiles(name, is_active)')
 
     if (linksError || membersError) {
         console.error('Error fetching stats data', linksError, membersError)
@@ -60,13 +60,18 @@ export async function getDashboardStats() {
         ? Math.round(links.reduce((acc, curr) => acc + curr.duration_minutes, 0) / totalLinks)
         : 0
 
-    const totalMembers = members.length
-    const totalFlops = members.filter(m => m.is_flop).length
+    // Filter to only include currently active members for stats
+    // @ts-ignore
+    const activeMembersHistory = members.filter(m => m.profiles?.is_active !== false)
+
+    const totalMembers = activeMembersHistory.length
+    const totalFlops = activeMembersHistory.filter(m => m.is_flop).length
     const flopRate = totalMembers > 0 ? Math.round((totalFlops / totalMembers) * 100) : 0
 
     // Calculate top flopper
     const flopsByPerson: Record<string, number> = {}
-    members.forEach(m => {
+    activeMembersHistory.forEach(m => {
+        // @ts-ignore
         if (m.is_flop && m.profiles) {
             // @ts-ignore
             const name = m.profiles.name
@@ -83,10 +88,52 @@ export async function getDashboardStats() {
         }
     })
 
+    // Calculate attendance for Overview chart
+    const attendanceByPerson: Record<string, number> = {}
+    activeMembersHistory.forEach(m => {
+        // @ts-ignore
+        if (!m.is_flop && m.profiles) {
+            // @ts-ignore
+            const name = m.profiles.name
+            attendanceByPerson[name] = (attendanceByPerson[name] || 0) + 1
+        }
+    })
+
+    const attendanceData = Object.entries(attendanceByPerson)
+        .map(([name, total]) => ({ name, total }))
+        .sort((a, b) => b.total - a.total)
+
     return {
         totalLinks,
         avgDuration,
         flopRate,
-        topFlopper
+        topFlopper,
+        attendanceData
     }
+}
+
+export async function getFlops() {
+    const { data, error } = await supabase
+        .from('link_members')
+        .select(`
+      profile_id,
+      flop_reason,
+      profiles (name),
+      links (id, purpose, date)
+    `)
+        .eq('is_flop', true)
+        .order('created_at', { ascending: false })
+
+    if (error) {
+        console.error('Error fetching flops:', error)
+        return []
+    }
+
+    // Flatten the structure for easier consumption
+    return data.map((item: any) => ({
+        ...item,
+        name: item.profiles?.name,
+        link_date: item.links?.date,
+        purpose: item.links?.purpose
+    }))
 }

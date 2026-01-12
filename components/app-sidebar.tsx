@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button'
 
 const sidebarItems = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-    { name: 'Add Link', href: '/add', icon: PlusCircle },
     { name: 'History', href: '/history', icon: History },
 ]
 
