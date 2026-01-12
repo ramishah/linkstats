@@ -22,15 +22,15 @@ interface LinkFormProps {
 
 export function LinkForm({ friends, initialData, isEdit = false, onSuccess }: LinkFormProps) {
     // Parse initial members if editing
-    const initialAttendees = new Set(
+    const initialAttendees = new Set<string>(
         initialData?.link_members
             ?.filter((m: any) => !m.is_flop)
-            .map((m: any) => m.profile_id) || []
+            .map((m: any) => m.profile_id as string) || []
     )
-    const initialFloppers = new Set(
+    const initialFloppers = new Set<string>(
         initialData?.link_members
             ?.filter((m: any) => m.is_flop)
-            .map((m: any) => m.profile_id) || []
+            .map((m: any) => m.profile_id as string) || []
     )
 
     // Date & Time State
