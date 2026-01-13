@@ -1,14 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createLink, updateLink } from '@/lib/actions'
+import { searchLocations, type GeocodingResult } from '@/lib/geocoding'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { format } from "date-fns"
-import { CalendarIcon, ChevronDownIcon } from "lucide-react"
+import { ChevronDownIcon, MapPin, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -54,7 +55,7 @@ export function LinkForm({ friends, initialData, isEdit = false, onSuccess }: Li
             const newDate = new Date(date)
             newDate.setHours(hours)
             newDate.setMinutes(minutes)
-            setCombinedDateTime(newDate.toISOString()) // Or format nicely for the backend if needed, but ISO is safe
+            setCombinedDateTime(newDate.toISOString())
         }
     }, [date, time])
 
@@ -68,6 +69,62 @@ export function LinkForm({ friends, initialData, isEdit = false, onSuccess }: Li
 
     const [selectedFloppers, setSelectedFloppers] = useState<Set<string>>(initialFloppers)
     const [isCalendarOpen, setIsCalendarOpen] = useState(false)
+
+    // Location autocomplete state
+    const [locationInput, setLocationInput] = useState(initialData?.location_name || '')
+    const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(
+        initialData?.location_lat && initialData?.location_lng
+            ? { lat: initialData.location_lat, lng: initialData.location_lng }
+            : null
+    )
+    const [suggestions, setSuggestions] = useState<GeocodingResult[]>([])
+    const [isSearching, setIsSearching] = useState(false)
+    const [showDropdown, setShowDropdown] = useState(false)
+    const dropdownRef = useRef<HTMLDivElement>(null)
+    const inputRef = useRef<HTMLInputElement>(null)
+
+    // Debounced search effect
+    useEffect(() => {
+        if (!locationInput.trim() || locationInput.length < 3 || coordinates) {
+            setSuggestions([])
+            return
+        }
+
+        const debounceTimer = setTimeout(async () => {
+            setIsSearching(true)
+            const results = await searchLocations(locationInput)
+            setSuggestions(results)
+            setShowDropdown(results.length > 0)
+            setIsSearching(false)
+        }, 400) // 400ms debounce
+
+        return () => clearTimeout(debounceTimer)
+    }, [locationInput, coordinates])
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node) &&
+                inputRef.current && !inputRef.current.contains(event.target as Node)) {
+                setShowDropdown(false)
+            }
+        }
+
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [])
+
+    const handleSelectLocation = (result: GeocodingResult) => {
+        setLocationInput(result.display_name)
+        setCoordinates({ lat: result.lat, lng: result.lng })
+        setSuggestions([])
+        setShowDropdown(false)
+    }
+
+    const handleLocationInputChange = (value: string) => {
+        setLocationInput(value)
+        setCoordinates(null) // Clear coordinates when user types
+    }
 
     const handleFlopperChange = (id: string, checked: boolean) => {
         const next = new Set(selectedFloppers)
@@ -197,12 +254,61 @@ export function LinkForm({ friends, initialData, isEdit = false, onSuccess }: Li
 
                     <div className="space-y-2">
                         <Label htmlFor="location">Location</Label>
-                        <Input
-                            id="location"
-                            name="location"
-                            placeholder="e.g. Starbucks, Rami's House"
-                            defaultValue={initialData?.location_name || ''}
-                        />
+                        <div className="relative">
+                            <div className="relative">
+                                <Input
+                                    ref={inputRef}
+                                    id="location"
+                                    name="location"
+                                    placeholder="Start typing an address..."
+                                    value={locationInput}
+                                    onChange={(e) => handleLocationInputChange(e.target.value)}
+                                    onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
+                                    autoComplete="off"
+                                    className={cn(
+                                        "pr-10",
+                                        coordinates && "border-green-600"
+                                    )}
+                                />
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                    {isSearching ? (
+                                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                    ) : coordinates ? (
+                                        <MapPin className="h-4 w-4 text-green-500" />
+                                    ) : (
+                                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                                    )}
+                                </div>
+                            </div>
+
+                            {showDropdown && suggestions.length > 0 && (
+                                <div
+                                    ref={dropdownRef}
+                                    className="absolute z-50 w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-md shadow-lg max-h-60 overflow-auto"
+                                >
+                                    {suggestions.map((result, index) => (
+                                        <button
+                                            key={index}
+                                            type="button"
+                                            className="w-full px-3 py-2 text-left text-sm hover:bg-zinc-800 focus:bg-zinc-800 focus:outline-none border-b border-zinc-800 last:border-b-0"
+                                            onClick={() => handleSelectLocation(result)}
+                                        >
+                                            <div className="flex items-start gap-2">
+                                                <MapPin className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
+                                                <span className="line-clamp-2">{result.display_name}</span>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        {coordinates && (
+                            <p className="text-xs text-green-500">
+                                Location selected ({coordinates.lat.toFixed(4)}, {coordinates.lng.toFixed(4)})
+                            </p>
+                        )}
+                        <input type="hidden" name="latitude" value={coordinates?.lat || ''} />
+                        <input type="hidden" name="longitude" value={coordinates?.lng || ''} />
                     </div>
 
                     <div className="grid grid-cols-2 gap-8">

@@ -112,3 +112,16 @@ export function MemberStatusSkeleton() {
         </Card>
     )
 }
+
+export function MapSkeleton() {
+    return (
+        <Card className="h-full">
+            <CardHeader className="pb-2">
+                <CardTitle><Skeleton className="h-6 w-[120px]" /></CardTitle>
+            </CardHeader>
+            <CardContent className="h-[350px] p-0">
+                <Skeleton className="h-full w-full rounded-b-lg" />
+            </CardContent>
+        </Card>
+    )
+}

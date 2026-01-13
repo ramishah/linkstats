@@ -7,6 +7,8 @@ import { redirect } from 'next/navigation'
 export async function createLink(formData: FormData) {
     const purpose = formData.get('purpose') as string
     const location = formData.get('location') as string
+    const latitude = formData.get('latitude') as string
+    const longitude = formData.get('longitude') as string
     const duration = parseInt(formData.get('duration') as string)
     const date = formData.get('date') as string // "YYYY-MM-DDTHH:mm"
 
@@ -19,6 +21,8 @@ export async function createLink(formData: FormData) {
         .insert({
             purpose,
             location_name: location,
+            location_lat: latitude ? parseFloat(latitude) : null,
+            location_lng: longitude ? parseFloat(longitude) : null,
             duration_minutes: duration,
             date: new Date(date).toISOString()
         })
@@ -72,6 +76,8 @@ export async function createLink(formData: FormData) {
 export async function updateLink(id: string, formData: FormData) {
     const purpose = formData.get('purpose') as string
     const location = formData.get('location') as string
+    const latitude = formData.get('latitude') as string
+    const longitude = formData.get('longitude') as string
     const duration = parseInt(formData.get('duration') as string)
     const date = formData.get('date') as string
 
@@ -84,6 +90,8 @@ export async function updateLink(id: string, formData: FormData) {
         .update({
             purpose,
             location_name: location,
+            location_lat: latitude ? parseFloat(latitude) : null,
+            location_lng: longitude ? parseFloat(longitude) : null,
             duration_minutes: duration,
             date: new Date(date).toISOString()
         })

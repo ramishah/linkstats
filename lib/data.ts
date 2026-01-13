@@ -149,3 +149,26 @@ export async function getFlops() {
         purpose: item.links?.purpose
     }))
 }
+
+export async function getLinksWithLocations() {
+    const { data, error } = await supabase
+        .from('links')
+        .select(`
+            id,
+            purpose,
+            location_name,
+            location_lat,
+            location_lng,
+            date
+        `)
+        .not('location_lat', 'is', null)
+        .not('location_lng', 'is', null)
+        .order('date', { ascending: false })
+
+    if (error) {
+        console.error('Error fetching links with locations:', error)
+        return []
+    }
+
+    return data
+}

@@ -5,13 +5,15 @@ import { OverviewWrapper } from "@/components/dashboard/overview-wrapper"
 import { FlopWallWrapper } from "@/components/dashboard/flop-wall-wrapper"
 import { MemberStatusWrapper } from "@/components/dashboard/member-status-wrapper"
 import { AddLinkDialogWrapper } from "@/components/dashboard/add-link-dialog-wrapper"
+import { LocationMapWrapper } from "@/components/dashboard/location-map-wrapper"
 import {
   StatsCardsSkeleton,
   OverviewSkeleton,
   FlopWallSkeleton,
   MemberStatusSkeleton,
   RecentLinksSkeleton,
-  AddLinkButtonSkeleton
+  AddLinkButtonSkeleton,
+  MapSkeleton
 } from "@/components/skeletons"
 
 export const revalidate = 0; // Ensure fresh data on every load
@@ -31,6 +33,10 @@ export default function Home() {
 
       <Suspense fallback={<StatsCardsSkeleton />}>
         <StatsCards />
+      </Suspense>
+
+      <Suspense fallback={<MapSkeleton />}>
+        <LocationMapWrapper />
       </Suspense>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
