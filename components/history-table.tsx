@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { deleteLink } from '@/lib/actions'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -11,13 +12,15 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { Trash2 } from 'lucide-react'
+import { Trash2, Star } from 'lucide-react'
 import { EditLinkDialog } from '@/components/edit-link-dialog'
 import { RateLinkDialog } from '@/components/rate-link-dialog'
 import { ViewLinkDialog } from '@/components/view-link-dialog'
 import { formatAddress } from '@/lib/utils'
 
 export function HistoryTable({ links, friends, significantLocations = [] }: { links: any[], friends: any[], significantLocations?: any[] }) {
+    const [selectedLink, setSelectedLink] = useState<any>(null)
+
     return (
         <div className="rounded-md border">
             <Table>
@@ -25,6 +28,7 @@ export function HistoryTable({ links, friends, significantLocations = [] }: { li
                     <TableRow>
                         <TableHead>Date</TableHead>
                         <TableHead>Purpose</TableHead>
+                        <TableHead>Rating</TableHead>
                         <TableHead>Location</TableHead>
                         <TableHead>Duration</TableHead>
                         <TableHead>Members</TableHead>
@@ -34,7 +38,7 @@ export function HistoryTable({ links, friends, significantLocations = [] }: { li
                 <TableBody>
                     {links.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={6} className="h-24 text-center">
+                            <TableCell colSpan={7} className="h-24 text-center">
                                 No links recorded yet.
                             </TableCell>
                         </TableRow>
@@ -48,11 +52,29 @@ export function HistoryTable({ links, friends, significantLocations = [] }: { li
                             const hours = Math.floor(link.duration_minutes / 60)
                             const minutes = link.duration_minutes % 60
                             const linkLocations = link.link_locations || []
+                            const reviews = link.link_reviews || []
+                            const avgRating = reviews.length > 0
+                                ? (reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviews.length).toFixed(1)
+                                : null
 
                             return (
-                                <TableRow key={link.id}>
+                                <TableRow
+                                    key={link.id}
+                                    className="cursor-pointer hover:bg-zinc-800/50"
+                                    onClick={() => setSelectedLink(link)}
+                                >
                                     <TableCell>{new Date(link.date).toLocaleDateString()}</TableCell>
                                     <TableCell className="font-medium">{link.purpose}</TableCell>
+                                    <TableCell>
+                                        {avgRating ? (
+                                            <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 hover:bg-yellow-500/30">
+                                                <Star className="h-3 w-3 fill-yellow-400 mr-1" />
+                                                {avgRating}
+                                            </Badge>
+                                        ) : (
+                                            <span className="text-muted-foreground text-sm">-</span>
+                                        )}
+                                    </TableCell>
                                     <TableCell>
                                         {linkLocations.length > 0 ? (
                                             <div className="flex flex-wrap gap-1">
@@ -98,9 +120,8 @@ export function HistoryTable({ links, friends, significantLocations = [] }: { li
                                             )}
                                         </div>
                                     </TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                         <div className="flex justify-end gap-1">
-                                            <ViewLinkDialog link={link} significantLocations={significantLocations} />
                                             <RateLinkDialog link={link} friends={friends} />
                                             <EditLinkDialog link={link} friends={friends} />
                                             <Button
@@ -118,6 +139,13 @@ export function HistoryTable({ links, friends, significantLocations = [] }: { li
                     )}
                 </TableBody>
             </Table>
+
+            <ViewLinkDialog
+                link={selectedLink}
+                significantLocations={significantLocations}
+                open={!!selectedLink}
+                onOpenChange={(open) => !open && setSelectedLink(null)}
+            />
         </div>
     )
 }

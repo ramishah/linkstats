@@ -1,9 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Eye, Star, MapPin, Clock, Users } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogHeader } from "@/components/ui/dialog"
+import { Star, MapPin, Clock, Users } from "lucide-react"
+import { Dialog, DialogContent, DialogTitle, DialogHeader } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Map as MapComponent, MapMarker, MarkerContent, MapControls } from "@/components/ui/map"
 import { formatAddress } from "@/lib/utils"
@@ -11,6 +9,8 @@ import { formatAddress } from "@/lib/utils"
 interface ViewLinkDialogProps {
     link: any
     significantLocations?: any[]
+    open: boolean
+    onOpenChange: (open: boolean) => void
 }
 
 function StarRating({ rating }: { rating: number }) {
@@ -30,16 +30,14 @@ function StarRating({ rating }: { rating: number }) {
     )
 }
 
-export function ViewLinkDialog({ link, significantLocations = [] }: ViewLinkDialogProps) {
-    const [open, setOpen] = useState(false)
+export function ViewLinkDialog({ link, significantLocations = [], open, onOpenChange }: ViewLinkDialogProps) {
+    const attendees = link?.link_members?.filter((m: any) => !m.is_flop).map((m: any) => m.profiles?.name) || []
+    const floppers = link?.link_members?.filter((m: any) => m.is_flop).map((m: any) => m.profiles?.name) || []
+    const locations = link?.link_locations || []
+    const reviews = link?.link_reviews || []
 
-    const attendees = link.link_members?.filter((m: any) => !m.is_flop).map((m: any) => m.profiles?.name) || []
-    const floppers = link.link_members?.filter((m: any) => m.is_flop).map((m: any) => m.profiles?.name) || []
-    const locations = link.link_locations || []
-    const reviews = link.link_reviews || []
-
-    const hours = Math.floor(link.duration_minutes / 60)
-    const minutes = link.duration_minutes % 60
+    const hours = Math.floor((link?.duration_minutes || 0) / 60)
+    const minutes = (link?.duration_minutes || 0) % 60
 
     // Calculate center for map
     const hasLocations = locations.length > 0
@@ -55,13 +53,10 @@ export function ViewLinkDialog({ link, significantLocations = [] }: ViewLinkDial
         ? (reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviews.length).toFixed(1)
         : null
 
+    if (!link) return null
+
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button variant="ghost" size="icon" title="View details">
-                    <Eye className="h-4 w-4" />
-                </Button>
-            </DialogTrigger>
+        <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-2xl border-zinc-800 bg-zinc-950 max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="flex items-center justify-between">
