@@ -1,6 +1,8 @@
+import { cache } from 'react'
 import { supabase } from './supabase'
 
-export async function getFriends() {
+// Wrap data fetching functions with React cache() to deduplicate calls within a request
+export const getFriends = cache(async function getFriends() {
     const { data, error } = await supabase
         .from('profiles')
         .select('*, is_active')
@@ -11,7 +13,7 @@ export async function getFriends() {
         return []
     }
     return data
-}
+})
 
 export async function getRecentLinks() {
     const { data, error } = await supabase
@@ -34,20 +36,17 @@ export async function getRecentLinks() {
     return data
 }
 
-export async function getDashboardStats() {
-    // Fetch all links to calculate stats
-    const { data: links, error: linksError } = await supabase
-        .from('links')
-        .select('duration_minutes, created_at')
+export const getDashboardStats = cache(async function getDashboardStats() {
+    // Fetch all data in parallel for better performance
+    const [linksResult, membersResult, activeFriendsResult] = await Promise.all([
+        supabase.from('links').select('duration_minutes, created_at'),
+        supabase.from('link_members').select('is_flop, profile_id, profiles(name, is_active)'),
+        supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('is_active', true)
+    ])
 
-    const { data: members, error: membersError } = await supabase
-        .from('link_members')
-        .select('is_flop, profile_id, profiles(name, is_active)')
-
-    const { count: activeFriendsCount, error: activeFriendsError } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_active', true)
+    const { data: links, error: linksError } = linksResult
+    const { data: members, error: membersError } = membersResult
+    const { count: activeFriendsCount, error: activeFriendsError } = activeFriendsResult
 
     if (linksError || membersError || activeFriendsError) {
         console.error('Error fetching stats data', linksError, membersError, activeFriendsError)
@@ -123,7 +122,7 @@ export async function getDashboardStats() {
         topFlopper,
         attendanceData
     }
-}
+})
 
 export async function getFlops() {
     const { data, error } = await supabase
