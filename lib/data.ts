@@ -1,5 +1,6 @@
 import { cache } from 'react'
 import { supabase } from './supabase'
+import { FlattenedLinkLocation } from './types'
 
 // Wrap data fetching functions with React cache() to deduplicate calls within a request
 export const getFriends = cache(async function getFriends() {
@@ -150,19 +151,19 @@ export async function getFlops() {
     }))
 }
 
-export async function getLinksWithLocations() {
+export async function getLinksWithLocations(): Promise<FlattenedLinkLocation[]> {
     const { data, error } = await supabase
         .from('links')
         .select(`
             id,
             purpose,
-            location_name,
-            location_lat,
-            location_lng,
-            date
+            date,
+            link_locations (
+                location_name,
+                location_lat,
+                location_lng
+            )
         `)
-        .not('location_lat', 'is', null)
-        .not('location_lng', 'is', null)
         .order('date', { ascending: false })
 
     if (error) {
@@ -170,7 +171,22 @@ export async function getLinksWithLocations() {
         return []
     }
 
-    return data
+    // Flatten: one entry per location for map display
+    const flattened: FlattenedLinkLocation[] = []
+    for (const link of data) {
+        for (const loc of (link.link_locations as any[]) || []) {
+            flattened.push({
+                id: link.id,
+                purpose: link.purpose,
+                location_name: loc.location_name,
+                location_lat: loc.location_lat,
+                location_lng: loc.location_lng,
+                date: link.date
+            })
+        }
+    }
+
+    return flattened
 }
 
 export const getSignificantLocations = cache(async function getSignificantLocations() {
@@ -187,9 +203,8 @@ export const getSignificantLocations = cache(async function getSignificantLocati
 
 export const getDistinctLocations = cache(async function getDistinctLocations() {
     const { data, error } = await supabase
-        .from('links')
+        .from('link_locations')
         .select('location_name')
-        .not('location_name', 'is', null)
         .order('location_name')
 
     if (error) {
@@ -197,7 +212,6 @@ export const getDistinctLocations = cache(async function getDistinctLocations() 
         return []
     }
 
-    // @ts-ignore
     const uniqueLocations = Array.from(new Set(data.map(item => item.location_name)))
     return uniqueLocations as string[]
 })

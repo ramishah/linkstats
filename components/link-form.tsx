@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { format } from "date-fns"
-import { ChevronDownIcon, MapPin, Loader2 } from "lucide-react"
+import { ChevronDownIcon, MapPin, Loader2, X } from "lucide-react"
+import { Location } from '@/lib/types'
 import { cn } from "@/lib/utils"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -70,13 +71,18 @@ export function LinkForm({ friends, initialData, isEdit = false, onSuccess }: Li
     const [selectedFloppers, setSelectedFloppers] = useState<Set<string>>(initialFloppers)
     const [isCalendarOpen, setIsCalendarOpen] = useState(false)
 
-    // Location autocomplete state
-    const [locationInput, setLocationInput] = useState(initialData?.location_name || '')
-    const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(
-        initialData?.location_lat && initialData?.location_lng
-            ? { lat: initialData.location_lat, lng: initialData.location_lng }
-            : null
+    // Multi-location state
+    const [locations, setLocations] = useState<Location[]>(
+        initialData?.link_locations?.map((loc: any) => ({
+            location_name: loc.location_name,
+            location_lat: loc.location_lat,
+            location_lng: loc.location_lng
+        })) || []
     )
+
+    // Location search input state
+    const [locationInput, setLocationInput] = useState('')
+    const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null)
     const [suggestions, setSuggestions] = useState<GeocodingResult[]>([])
     const [isSearching, setIsSearching] = useState(false)
     const [showDropdown, setShowDropdown] = useState(false)
@@ -115,10 +121,21 @@ export function LinkForm({ friends, initialData, isEdit = false, onSuccess }: Li
     }, [])
 
     const handleSelectLocation = (result: GeocodingResult) => {
-        setLocationInput(result.display_name)
-        setCoordinates({ lat: result.lat, lng: result.lng })
+        // Add to locations array
+        setLocations(prev => [...prev, {
+            location_name: result.display_name,
+            location_lat: result.lat,
+            location_lng: result.lng
+        }])
+        // Clear input for next entry
+        setLocationInput('')
+        setCoordinates(null)
         setSuggestions([])
         setShowDropdown(false)
+    }
+
+    const handleRemoveLocation = (index: number) => {
+        setLocations(prev => prev.filter((_, i) => i !== index))
     }
 
     const handleLocationInputChange = (value: string) => {
@@ -253,28 +270,50 @@ export function LinkForm({ friends, initialData, isEdit = false, onSuccess }: Li
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="location">Location</Label>
+                        <Label htmlFor="location">Locations</Label>
+
+                        {/* List of added locations */}
+                        {locations.length > 0 && (
+                            <div className="space-y-2 mb-3">
+                                {locations.map((loc, index) => (
+                                    <div
+                                        key={index}
+                                        className="flex items-center justify-between bg-zinc-800/50 rounded-md px-3 py-2"
+                                    >
+                                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                                            <MapPin className="h-4 w-4 text-green-500 shrink-0" />
+                                            <span className="text-sm truncate">{loc.location_name}</span>
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 shrink-0"
+                                            onClick={() => handleRemoveLocation(index)}
+                                        >
+                                            <X className="h-4 w-4 text-muted-foreground" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Location search input */}
                         <div className="relative">
                             <div className="relative">
                                 <Input
                                     ref={inputRef}
                                     id="location"
-                                    name="location"
-                                    placeholder="Start typing an address..."
+                                    placeholder="Search and add locations..."
                                     value={locationInput}
                                     onChange={(e) => handleLocationInputChange(e.target.value)}
                                     onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
                                     autoComplete="off"
-                                    className={cn(
-                                        "pr-10",
-                                        coordinates && "border-green-600"
-                                    )}
+                                    className="pr-10"
                                 />
                                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
                                     {isSearching ? (
                                         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                                    ) : coordinates ? (
-                                        <MapPin className="h-4 w-4 text-green-500" />
                                     ) : (
                                         <MapPin className="h-4 w-4 text-muted-foreground" />
                                     )}
@@ -302,13 +341,15 @@ export function LinkForm({ friends, initialData, isEdit = false, onSuccess }: Li
                                 </div>
                             )}
                         </div>
-                        {coordinates && (
+
+                        {locations.length > 0 && (
                             <p className="text-xs text-green-500">
-                                Location selected ({coordinates.lat.toFixed(4)}, {coordinates.lng.toFixed(4)})
+                                {locations.length} location{locations.length > 1 ? 's' : ''} added
                             </p>
                         )}
-                        <input type="hidden" name="latitude" value={coordinates?.lat || ''} />
-                        <input type="hidden" name="longitude" value={coordinates?.lng || ''} />
+
+                        {/* Hidden input for form submission */}
+                        <input type="hidden" name="locations" value={JSON.stringify(locations)} />
                     </div>
 
                     <div className="grid grid-cols-2 gap-8">

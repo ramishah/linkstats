@@ -13,6 +13,19 @@ async function getAllLinks() {
         is_flop,
         flop_reason,
         profiles (name)
+      ),
+      link_locations (
+        id,
+        location_name,
+        location_lat,
+        location_lng
+      ),
+      link_reviews (
+        id,
+        rating,
+        comment,
+        created_at,
+        profiles (id, name)
       )
     `)
         .order('date', { ascending: false })

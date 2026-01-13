@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/table"
 import { Trash2 } from 'lucide-react'
 import { EditLinkDialog } from '@/components/edit-link-dialog'
+import { RateLinkDialog } from '@/components/rate-link-dialog'
+import { ViewLinkDialog } from '@/components/view-link-dialog'
 import { formatAddress } from '@/lib/utils'
 
 export function HistoryTable({ links, friends, significantLocations = [] }: { links: any[], friends: any[], significantLocations?: any[] }) {
@@ -45,13 +47,35 @@ export function HistoryTable({ links, friends, significantLocations = [] }: { li
 
                             const hours = Math.floor(link.duration_minutes / 60)
                             const minutes = link.duration_minutes % 60
-                            const sigLoc = significantLocations?.find((sl: any) => sl.address === link.location_name)
+                            const linkLocations = link.link_locations || []
 
                             return (
                                 <TableRow key={link.id}>
                                     <TableCell>{new Date(link.date).toLocaleDateString()}</TableCell>
                                     <TableCell className="font-medium">{link.purpose}</TableCell>
-                                    <TableCell>{sigLoc ? <Badge variant="outline" className="font-normal">{sigLoc.label}</Badge> : formatAddress(link.location_name)}</TableCell>
+                                    <TableCell>
+                                        {linkLocations.length > 0 ? (
+                                            <div className="flex flex-wrap gap-1">
+                                                {linkLocations.map((loc: any, i: number) => {
+                                                    const sigLoc = significantLocations?.find(
+                                                        (sl: any) => sl.address === loc.location_name
+                                                    )
+                                                    return sigLoc ? (
+                                                        <Badge key={i} variant="outline" className="font-normal">
+                                                            {sigLoc.label}
+                                                        </Badge>
+                                                    ) : (
+                                                        <span key={i} className="text-sm">
+                                                            {formatAddress(loc.location_name)}
+                                                            {i < linkLocations.length - 1 && ', '}
+                                                        </span>
+                                                    )
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <span className="text-muted-foreground text-sm">No location</span>
+                                        )}
+                                    </TableCell>
                                     <TableCell>{hours}h {minutes}m</TableCell>
                                     <TableCell>
                                         <div className="flex flex-col gap-2">
@@ -75,7 +99,9 @@ export function HistoryTable({ links, friends, significantLocations = [] }: { li
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        <div className="flex justify-end gap-2">
+                                        <div className="flex justify-end gap-1">
+                                            <ViewLinkDialog link={link} significantLocations={significantLocations} />
+                                            <RateLinkDialog link={link} friends={friends} />
                                             <EditLinkDialog link={link} friends={friends} />
                                             <Button
                                                 variant="ghost"
