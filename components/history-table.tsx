@@ -13,8 +13,9 @@ import {
 } from "@/components/ui/table"
 import { Trash2 } from 'lucide-react'
 import { EditLinkDialog } from '@/components/edit-link-dialog'
+import { formatAddress } from '@/lib/utils'
 
-export function HistoryTable({ links, friends }: { links: any[], friends: any[] }) {
+export function HistoryTable({ links, friends, significantLocations = [] }: { links: any[], friends: any[], significantLocations?: any[] }) {
     return (
         <div className="rounded-md border">
             <Table>
@@ -44,12 +45,13 @@ export function HistoryTable({ links, friends }: { links: any[], friends: any[] 
 
                             const hours = Math.floor(link.duration_minutes / 60)
                             const minutes = link.duration_minutes % 60
+                            const sigLoc = significantLocations?.find((sl: any) => sl.address === link.location_name)
 
                             return (
                                 <TableRow key={link.id}>
                                     <TableCell>{new Date(link.date).toLocaleDateString()}</TableCell>
                                     <TableCell className="font-medium">{link.purpose}</TableCell>
-                                    <TableCell>{link.location_name}</TableCell>
+                                    <TableCell>{sigLoc ? <Badge variant="outline" className="font-normal">{sigLoc.label}</Badge> : formatAddress(link.location_name)}</TableCell>
                                     <TableCell>{hours}h {minutes}m</TableCell>
                                     <TableCell>
                                         <div className="flex flex-col gap-2">

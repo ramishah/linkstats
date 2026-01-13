@@ -1,8 +1,9 @@
 "use client"
 
 import { useMemo } from "react"
+import { formatAddress } from "@/lib/utils"
 import { Map as MapComponent, MapMarker, MarkerContent, MarkerPopup, MarkerTooltip, MapControls } from "@/components/ui/map"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface LinkLocation {
     id: string
@@ -13,8 +14,11 @@ interface LinkLocation {
     date: string
 }
 
+import { Badge } from "@/components/ui/badge"
+
 interface LocationMapProps {
     links: LinkLocation[]
+    significantLocations?: { address: string; label: string }[]
 }
 
 interface GroupedLocation {
@@ -57,7 +61,7 @@ function groupLinksByLocation(links: LinkLocation[]): GroupedLocation[] {
     return Object.values(groups)
 }
 
-export function LocationMap({ links }: LocationMapProps) {
+export function LocationMap({ links, significantLocations = [] }: LocationMapProps) {
     const groupedLocations = useMemo(() => groupLinksByLocation(links), [links])
 
     if (links.length === 0) {
@@ -78,11 +82,14 @@ export function LocationMap({ links }: LocationMapProps) {
     const center = calculateCenter(groupedLocations)
 
     return (
-        <Card className="h-full">
-            <CardHeader className="pb-2">
+        <Card className="h-full pb-0 overflow-hidden">
+            <CardHeader>
                 <CardTitle>Link Locations</CardTitle>
+                <CardDescription>
+                    Click on a location to view the links at that location.
+                </CardDescription>
             </CardHeader>
-            <CardContent className="h-[350px] p-0 overflow-hidden rounded-b-lg">
+            <CardContent className="h-[500px] p-0">
                 <MapComponent
                     center={center}
                     zoom={11}
@@ -100,21 +107,39 @@ export function LocationMap({ links }: LocationMapProps) {
                         >
                             <MarkerContent>
                                 <div className="relative">
-                                    <div className="size-4 rounded-full bg-primary border-2 border-white shadow-lg" />
-                                    {group.links.length > 1 && (
-                                        <div className="absolute -top-2 -right-2 size-5 rounded-full bg-red-500 border border-white text-[10px] font-bold text-white flex items-center justify-center">
+                                    {group.links.length > 1 ? (
+                                        <div className="size-6 rounded-full bg-black border-2 border-white shadow-lg flex items-center justify-center text-xs font-bold text-white">
                                             {group.links.length}
                                         </div>
+                                    ) : (
+                                        <div className="size-4 rounded-full bg-primary border-2 border-white shadow-lg" />
                                     )}
                                 </div>
                             </MarkerContent>
                             <MarkerTooltip>
-                                {group.location_name}
-                                {group.links.length > 1 && ` (${group.links.length} links)`}
+                                {significantLocations?.find(l => l.address === group.location_name) ? (
+                                    <div className="flex items-center gap-2">
+                                        <Badge variant="outline" className="bg-background text-foreground border-foreground/20">
+                                            {significantLocations.find(l => l.address === group.location_name)!.label}
+                                        </Badge>
+                                        {group.links.length > 1 && <span className="text-xs">({group.links.length} links)</span>}
+                                    </div>
+                                ) : (
+                                    <>
+                                        {formatAddress(group.location_name)}
+                                        {group.links.length > 1 && ` (${group.links.length} links)`}
+                                    </>
+                                )}
                             </MarkerTooltip>
                             <MarkerPopup>
                                 <div className="space-y-2 max-h-48 overflow-y-auto">
-                                    <p className="text-xs text-muted-foreground font-medium">{group.location_name}</p>
+                                    {significantLocations?.find(l => l.address === group.location_name) ? (
+                                        <Badge variant="outline" className="mb-2 bg-background text-foreground border-foreground/20">
+                                            {significantLocations.find(l => l.address === group.location_name)!.label}
+                                        </Badge>
+                                    ) : (
+                                        <p className="text-xs text-muted-foreground font-medium">{formatAddress(group.location_name)}</p>
+                                    )}
                                     <div className="space-y-2">
                                         {group.links.map((link) => (
                                             <div key={link.id} className="border-t border-border pt-2 first:border-t-0 first:pt-0">

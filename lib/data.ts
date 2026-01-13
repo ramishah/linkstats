@@ -172,3 +172,32 @@ export async function getLinksWithLocations() {
 
     return data
 }
+
+export const getSignificantLocations = cache(async function getSignificantLocations() {
+    const { data, error } = await supabase
+        .from('significant_locations')
+        .select('*')
+
+    if (error) {
+        console.error('Error fetching significant locations:', error)
+        return []
+    }
+    return data
+})
+
+export const getDistinctLocations = cache(async function getDistinctLocations() {
+    const { data, error } = await supabase
+        .from('links')
+        .select('location_name')
+        .not('location_name', 'is', null)
+        .order('location_name')
+
+    if (error) {
+        console.error('Error fetching distinct locations:', error)
+        return []
+    }
+
+    // @ts-ignore
+    const uniqueLocations = Array.from(new Set(data.map(item => item.location_name)))
+    return uniqueLocations as string[]
+})

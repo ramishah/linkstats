@@ -142,3 +142,50 @@ export async function deleteLink(id: string) {
     revalidatePath('/')
     revalidatePath('/history')
 }
+
+export async function createSignificantLocation(address: string, label: string) {
+    const { error } = await supabase
+        .from('significant_locations')
+        .insert({
+            address,
+            label,
+        })
+
+    if (error) {
+        console.error('Error creating significant location:', error)
+        throw new Error('Failed to create significant location')
+    }
+
+    revalidatePath('/history')
+    return { success: true }
+}
+
+export async function updateSignificantLocation(address: string, newLabel: string) {
+    const { error } = await supabase
+        .from('significant_locations')
+        .update({ label: newLabel })
+        .eq('address', address)
+
+    if (error) {
+        console.error('Error updating significant location:', error)
+        throw new Error('Failed to update significant location')
+    }
+
+    revalidatePath('/history')
+    return { success: true }
+}
+
+export async function deleteSignificantLocation(address: string) {
+    const { error } = await supabase
+        .from('significant_locations')
+        .delete()
+        .eq('address', address)
+
+    if (error) {
+        console.error('Error deleting significant location:', error)
+        throw new Error('Failed to delete significant location')
+    }
+
+    revalidatePath('/history')
+    return { success: true }
+}
