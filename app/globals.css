@@ -124,6 +124,11 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Hide text caret on non-input elements */
+  *:not(input):not(textarea):not([contenteditable="true"]) {
+    caret-color: transparent;
+  }
   .maplibregl-popup-content {
     @apply bg-transparent! shadow-none! p-0! rounded-none!;
   }

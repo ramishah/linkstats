@@ -26,6 +26,12 @@ async function getAllLinks() {
         comment,
         created_at,
         profiles (id, name)
+      ),
+      link_images (
+        id,
+        storage_path,
+        file_name,
+        created_at
       )
     `)
         .order('date', { ascending: false })

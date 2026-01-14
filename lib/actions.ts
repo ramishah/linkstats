@@ -243,3 +243,49 @@ export async function createLinkReview(linkId: string, profileId: string, rating
     revalidatePath('/history')
     return { success: true }
 }
+
+export async function saveLinkImage(linkId: string, storagePath: string, fileName: string) {
+    const { data, error } = await supabase
+        .from('link_images')
+        .insert({
+            link_id: linkId,
+            storage_path: storagePath,
+            file_name: fileName
+        })
+        .select('id')
+        .single()
+
+    if (error) {
+        console.error('Error saving image reference:', error)
+        throw new Error('Failed to save image')
+    }
+
+    revalidatePath('/history')
+    return { success: true, id: data.id }
+}
+
+export async function deleteLinkImage(imageId: string, storagePath: string) {
+    // Delete from storage
+    const { error: storageError } = await supabase
+        .storage
+        .from('link-images')
+        .remove([storagePath])
+
+    if (storageError) {
+        console.error('Error deleting from storage:', storageError)
+    }
+
+    // Delete from database
+    const { error: dbError } = await supabase
+        .from('link_images')
+        .delete()
+        .eq('id', imageId)
+
+    if (dbError) {
+        console.error('Error deleting image reference:', dbError)
+        throw new Error('Failed to delete image')
+    }
+
+    revalidatePath('/history')
+    return { success: true }
+}
