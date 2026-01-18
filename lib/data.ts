@@ -25,6 +25,11 @@ export async function getRecentLinks() {
         profile_id,
         is_flop,
         profiles (name)
+      ),
+      link_locations (
+        location_name,
+        location_lat,
+        location_lng
       )
     `)
         .order('date', { ascending: false })

@@ -2,14 +2,16 @@
 
 import { useState, useRef, useEffect } from "react"
 import { createPortal } from "react-dom"
-import { Star, MapPin, Clock, Users, Plus, X, ImageIcon } from "lucide-react"
+import { Star, MapPin, Clock, Users, Plus, X, ImageIcon, Pencil } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle, DialogHeader } from "@/components/ui/dialog"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Map as MapComponent, MapMarker, MarkerContent, MarkerPopup, MarkerTooltip, MapControls } from "@/components/ui/map"
 import { formatAddress } from "@/lib/utils"
 import { supabase } from "@/lib/supabase"
-import { saveLinkImage, deleteLinkImage } from "@/lib/actions"
+import { saveLinkImage, deleteLinkImage, createSignificantLocation, updateSignificantLocation } from "@/lib/actions"
 
 interface ViewLinkDialogProps {
     link: any
@@ -39,6 +41,9 @@ export function ViewLinkDialog({ link, significantLocations = [], open, onOpenCh
     const [isUploading, setIsUploading] = useState(false)
     const [lightboxImage, setLightboxImage] = useState<string | null>(null)
     const [images, setImages] = useState<any[]>([])
+    const [editingLocation, setEditingLocation] = useState<string | null>(null)
+    const [labelInput, setLabelInput] = useState("")
+    const [localSignificantLocations, setLocalSignificantLocations] = useState<any[]>(significantLocations)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     // Sync images when link changes or dialog opens
@@ -54,6 +59,37 @@ export function ViewLinkDialog({ link, significantLocations = [], open, onOpenCh
             setLightboxImage(null)
         }
     }, [open])
+
+    // Sync significant locations when prop changes
+    useEffect(() => {
+        setLocalSignificantLocations(significantLocations)
+    }, [significantLocations])
+
+    const handleSaveLocationLabel = async (address: string, label: string) => {
+        const existingSigLoc = localSignificantLocations.find(sl => sl.address === address)
+
+        try {
+            if (existingSigLoc) {
+                await updateSignificantLocation(address, label)
+            } else {
+                await createSignificantLocation(address, label)
+            }
+
+            // Update local state immediately
+            if (existingSigLoc) {
+                setLocalSignificantLocations(prev =>
+                    prev.map(sl => sl.address === address ? { ...sl, label } : sl)
+                )
+            } else {
+                setLocalSignificantLocations(prev => [...prev, { address, label }])
+            }
+
+            setEditingLocation(null)
+            setLabelInput("")
+        } catch (error) {
+            console.error('Failed to save location label:', error)
+        }
+    }
 
     const attendees = link?.link_members?.filter((m: any) => !m.is_flop).map((m: any) => m.profiles?.name) || []
     const floppers = link?.link_members?.filter((m: any) => m.is_flop).map((m: any) => m.profiles?.name) || []
@@ -159,7 +195,7 @@ export function ViewLinkDialog({ link, significantLocations = [], open, onOpenCh
                                 >
                                     <MapControls position="bottom-right" showZoom={true} />
                                     {locations.map((loc: any, i: number) => {
-                                        const sigLoc = significantLocations?.find(
+                                        const sigLoc = localSignificantLocations?.find(
                                             (sl: any) => sl.address === loc.location_name
                                         )
                                         return (
@@ -268,18 +304,79 @@ export function ViewLinkDialog({ link, significantLocations = [], open, onOpenCh
                                     <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
                                     <div className="flex flex-wrap gap-1">
                                         {locations.map((loc: any, i: number) => {
-                                            const sigLoc = significantLocations?.find(
+                                            const sigLoc = localSignificantLocations?.find(
                                                 (sl: any) => sl.address === loc.location_name
                                             )
-                                            return sigLoc ? (
-                                                <Badge key={i} variant="outline" className="font-normal">
-                                                    {sigLoc.label}
-                                                </Badge>
-                                            ) : (
-                                                <span key={i}>
-                                                    {formatAddress(loc.location_name)}
-                                                    {i < locations.length - 1 && ", "}
-                                                </span>
+                                            return (
+                                                <Popover
+                                                    key={i}
+                                                    open={editingLocation === loc.location_name}
+                                                    onOpenChange={(isOpen) => {
+                                                        if (isOpen) {
+                                                            setEditingLocation(loc.location_name)
+                                                            setLabelInput(sigLoc?.label || "")
+                                                        } else {
+                                                            setEditingLocation(null)
+                                                            setLabelInput("")
+                                                        }
+                                                    }}
+                                                >
+                                                    <PopoverTrigger asChild>
+                                                        <button className="inline-flex items-center gap-1 hover:opacity-70 transition-opacity">
+                                                            {sigLoc ? (
+                                                                <Badge variant="outline" className="font-normal cursor-pointer">
+                                                                    {sigLoc.label}
+                                                                    <Pencil className="h-3 w-3 ml-1 opacity-50" />
+                                                                </Badge>
+                                                            ) : (
+                                                                <Badge variant="secondary" className="font-normal cursor-pointer">
+                                                                    {formatAddress(loc.location_name)}
+                                                                    <Plus className="h-3 w-3 ml-1 opacity-50" />
+                                                                </Badge>
+                                                            )}
+                                                        </button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="w-64 p-3" align="start">
+                                                        <div className="space-y-2">
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {sigLoc ? "Edit label" : "Add a name for this location"}
+                                                            </p>
+                                                            <Input
+                                                                placeholder="e.g. Home, Work, Coffee Shop"
+                                                                value={labelInput}
+                                                                onChange={(e) => setLabelInput(e.target.value)}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === "Enter" && labelInput.trim()) {
+                                                                        handleSaveLocationLabel(loc.location_name, labelInput.trim())
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <div className="flex justify-end gap-2">
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    onClick={() => {
+                                                                        setEditingLocation(null)
+                                                                        setLabelInput("")
+                                                                    }}
+                                                                >
+                                                                    Cancel
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    onClick={() => {
+                                                                        if (labelInput.trim()) {
+                                                                            handleSaveLocationLabel(loc.location_name, labelInput.trim())
+                                                                        }
+                                                                    }}
+                                                                    disabled={!labelInput.trim()}
+                                                                >
+                                                                    Save
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    </PopoverContent>
+                                                </Popover>
                                             )
                                         })}
                                     </div>
