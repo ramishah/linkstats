@@ -1,7 +1,7 @@
 import { getRecentLinks, getFriends, getDistinctLocations, getSignificantLocations } from "@/lib/data"
 import { supabase } from "@/lib/supabase"
 import { HistoryTable } from "@/components/history-table"
-import { ManageSignificantLocationsDialog } from "@/components/add-significant-location-dialog"
+import { HistoryPageActions } from "@/components/history-page-actions"
 
 async function getAllLinks() {
     const { data, error } = await supabase
@@ -55,7 +55,11 @@ export default async function HistoryPage() {
         <div className="flex flex-col gap-6">
             <div className="flex items-center justify-between">
                 <h2 className="text-3xl font-bold tracking-tight">Link History</h2>
-                <ManageSignificantLocationsDialog distinctLocations={distinctLocations} significantLocations={significantLocations} />
+                <HistoryPageActions
+                    friends={friends}
+                    distinctLocations={distinctLocations}
+                    significantLocations={significantLocations}
+                />
             </div>
             <HistoryTable links={links} friends={friends} significantLocations={significantLocations} />
         </div>

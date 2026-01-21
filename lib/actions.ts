@@ -226,7 +226,7 @@ export async function deleteSignificantLocation(address: string) {
 }
 
 export async function createLinkReview(linkId: string, profileId: string, rating: number, comment?: string) {
-    const { error } = await supabase
+    const { data, error } = await supabase
         .from('link_reviews')
         .insert({
             link_id: linkId,
@@ -234,10 +234,27 @@ export async function createLinkReview(linkId: string, profileId: string, rating
             rating,
             comment: comment || null
         })
+        .select('id')
+        .single()
 
     if (error) {
         console.error('Error creating review:', error)
         throw new Error('Failed to create review')
+    }
+
+    revalidatePath('/history')
+    return { success: true, id: data.id }
+}
+
+export async function deleteLinkReview(reviewId: string) {
+    const { error } = await supabase
+        .from('link_reviews')
+        .delete()
+        .eq('id', reviewId)
+
+    if (error) {
+        console.error('Error deleting review:', error)
+        throw new Error('Failed to delete review')
     }
 
     revalidatePath('/history')

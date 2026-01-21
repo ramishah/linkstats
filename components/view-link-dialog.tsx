@@ -11,10 +11,14 @@ import { Input } from "@/components/ui/input"
 import { Map as MapComponent, MapMarker, MarkerContent, MarkerPopup, MarkerTooltip, MapControls } from "@/components/ui/map"
 import { formatAddress } from "@/lib/utils"
 import { supabase } from "@/lib/supabase"
-import { saveLinkImage, deleteLinkImage, createSignificantLocation, updateSignificantLocation } from "@/lib/actions"
+import { saveLinkImage, deleteLinkImage, createSignificantLocation, updateSignificantLocation, createLinkReview, deleteLinkReview } from "@/lib/actions"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface ViewLinkDialogProps {
     link: any
+    friends?: any[]
     significantLocations?: any[]
     open: boolean
     onOpenChange: (open: boolean) => void
@@ -37,7 +41,34 @@ function StarRating({ rating }: { rating: number }) {
     )
 }
 
-export function ViewLinkDialog({ link, significantLocations = [], open, onOpenChange }: ViewLinkDialogProps) {
+function InteractiveStarRating({ rating, onRatingChange }: { rating: number, onRatingChange: (rating: number) => void }) {
+    const [hoverRating, setHoverRating] = useState(0)
+
+    return (
+        <div className="flex gap-0.5">
+            {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                    key={star}
+                    type="button"
+                    className="p-0.5 hover:scale-110 transition-transform"
+                    onMouseEnter={() => setHoverRating(star)}
+                    onMouseLeave={() => setHoverRating(0)}
+                    onClick={() => onRatingChange(star)}
+                >
+                    <Star
+                        className={`h-6 w-6 ${
+                            star <= (hoverRating || rating)
+                                ? "fill-yellow-400 text-yellow-400"
+                                : "text-zinc-600"
+                        }`}
+                    />
+                </button>
+            ))}
+        </div>
+    )
+}
+
+export function ViewLinkDialog({ link, friends = [], significantLocations = [], open, onOpenChange }: ViewLinkDialogProps) {
     const [isUploading, setIsUploading] = useState(false)
     const [lightboxImage, setLightboxImage] = useState<string | null>(null)
     const [images, setImages] = useState<any[]>([])
@@ -46,6 +77,15 @@ export function ViewLinkDialog({ link, significantLocations = [], open, onOpenCh
     const [localSignificantLocations, setLocalSignificantLocations] = useState<any[]>(significantLocations)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
+    // Review functionality state
+    const [reviews, setReviews] = useState<any[]>([])
+    const [showReviewForm, setShowReviewForm] = useState(false)
+    const [showToast, setShowToast] = useState(false)
+    const [reviewRating, setReviewRating] = useState(0)
+    const [reviewComment, setReviewComment] = useState("")
+    const [reviewProfileId, setReviewProfileId] = useState("")
+    const [isSubmittingReview, setIsSubmittingReview] = useState(false)
+
     // Sync images when link changes or dialog opens
     useEffect(() => {
         if (link?.link_images) {
@@ -53,10 +93,21 @@ export function ViewLinkDialog({ link, significantLocations = [], open, onOpenCh
         }
     }, [link?.id, link?.link_images])
 
-    // Reset lightbox when dialog closes
+    // Sync reviews when link changes or dialog opens
+    useEffect(() => {
+        if (link?.link_reviews) {
+            setReviews(link.link_reviews)
+        }
+    }, [link?.id, link?.link_reviews])
+
+    // Reset lightbox and review form when dialog closes
     useEffect(() => {
         if (!open) {
             setLightboxImage(null)
+            setShowReviewForm(false)
+            setReviewRating(0)
+            setReviewComment("")
+            setReviewProfileId("")
         }
     }, [open])
 
@@ -94,7 +145,6 @@ export function ViewLinkDialog({ link, significantLocations = [], open, onOpenCh
     const attendees = link?.link_members?.filter((m: any) => !m.is_flop).map((m: any) => m.profiles?.name) || []
     const floppers = link?.link_members?.filter((m: any) => m.is_flop).map((m: any) => m.profiles?.name) || []
     const locations = link?.link_locations || []
-    const reviews = link?.link_reviews || []
 
     const hours = Math.floor((link?.duration_minutes || 0) / 60)
     const minutes = (link?.duration_minutes || 0) % 60
@@ -163,6 +213,49 @@ export function ViewLinkDialog({ link, significantLocations = [], open, onOpenCh
             setImages(prev => prev.filter(img => img.id !== imageId))
         } catch (error) {
             console.error('Delete failed:', error)
+        }
+    }
+
+    const handleSubmitReview = async () => {
+        if (!reviewProfileId || reviewRating === 0) return
+
+        setIsSubmittingReview(true)
+        try {
+            const result = await createLinkReview(link.id, reviewProfileId, reviewRating, reviewComment || undefined)
+
+            // Find the profile to display the name
+            const profile = friends.find(f => f.id === reviewProfileId)
+
+            // Add to local state for immediate display
+            setReviews(prev => [...prev, {
+                id: result.id,
+                rating: reviewRating,
+                comment: reviewComment || null,
+                profile_id: reviewProfileId,
+                profiles: profile ? { name: profile.name } : null,
+                created_at: new Date().toISOString()
+            }])
+
+            // Reset form and show toast
+            setShowReviewForm(false)
+            setReviewRating(0)
+            setReviewComment("")
+            setReviewProfileId("")
+            setShowToast(true)
+            setTimeout(() => setShowToast(false), 3000)
+        } catch (error) {
+            console.error('Failed to submit review:', error)
+        } finally {
+            setIsSubmittingReview(false)
+        }
+    }
+
+    const handleDeleteReview = async (reviewId: string) => {
+        try {
+            await deleteLinkReview(reviewId)
+            setReviews(prev => prev.filter(r => r.id !== reviewId))
+        } catch (error) {
+            console.error('Failed to delete review:', error)
         }
     }
 
@@ -418,22 +511,93 @@ export function ViewLinkDialog({ link, significantLocations = [], open, onOpenCh
                                 <h3 className="font-semibold">
                                     Reviews ({reviews.length})
                                 </h3>
-                                {avgRating && (
-                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                                        <span>{avgRating} average</span>
-                                    </div>
-                                )}
+                                <div className="flex items-center gap-3">
+                                    {avgRating && (
+                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                                            <span>{avgRating} average</span>
+                                        </div>
+                                    )}
+                                    <Button
+                                        size="sm"
+                                        className="bg-white text-black hover:bg-zinc-200"
+                                        onClick={() => setShowReviewForm(true)}
+                                        disabled={showReviewForm}
+                                    >
+                                        <Plus className="h-4 w-4 mr-1" /> Add Review
+                                    </Button>
+                                </div>
                             </div>
 
-                            {reviews.length === 0 ? (
+                            {/* Inline Review Form */}
+                            {showReviewForm && (
+                                <div className="bg-zinc-900/50 rounded-lg p-4 mb-4 space-y-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Rating</label>
+                                        <InteractiveStarRating
+                                            rating={reviewRating}
+                                            onRatingChange={setReviewRating}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Reviewer</label>
+                                        <Select value={reviewProfileId} onValueChange={setReviewProfileId}>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select person" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {friends.map((friend) => (
+                                                    <SelectItem key={friend.id} value={friend.id}>
+                                                        {friend.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Comment (optional)</label>
+                                        <Textarea
+                                            placeholder="Write a comment..."
+                                            value={reviewComment}
+                                            onChange={(e) => setReviewComment(e.target.value)}
+                                            rows={2}
+                                        />
+                                    </div>
+
+                                    <div className="flex justify-end gap-2">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                                setShowReviewForm(false)
+                                                setReviewRating(0)
+                                                setReviewComment("")
+                                                setReviewProfileId("")
+                                            }}
+                                        >
+                                            Cancel
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            onClick={handleSubmitReview}
+                                            disabled={!reviewProfileId || reviewRating === 0 || isSubmittingReview}
+                                        >
+                                            {isSubmittingReview ? "Submitting..." : "Submit Review"}
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {reviews.length === 0 && !showReviewForm ? (
                                 <p className="text-sm text-muted-foreground">No reviews yet.</p>
-                            ) : (
+                            ) : reviews.length > 0 ? (
                                 <div className="space-y-3">
                                     {reviews.map((review: any) => (
                                         <div
                                             key={review.id}
-                                            className="bg-zinc-900/50 rounded-lg p-3 space-y-2"
+                                            className="bg-zinc-900/50 rounded-lg p-3 space-y-2 group relative"
                                         >
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-2">
@@ -442,9 +606,17 @@ export function ViewLinkDialog({ link, significantLocations = [], open, onOpenCh
                                                         {review.profiles?.name || "Anonymous"}
                                                     </span>
                                                 </div>
-                                                <span className="text-xs text-muted-foreground">
-                                                    {new Date(review.created_at).toLocaleDateString()}
-                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {new Date(review.created_at).toLocaleDateString()}
+                                                    </span>
+                                                    <button
+                                                        className="p-1 bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        onClick={() => handleDeleteReview(review.id)}
+                                                    >
+                                                        <X className="h-3 w-3 text-white" />
+                                                    </button>
+                                                </div>
                                             </div>
                                             {review.comment && (
                                                 <p className="text-sm text-muted-foreground">
@@ -454,11 +626,20 @@ export function ViewLinkDialog({ link, significantLocations = [], open, onOpenCh
                                         </div>
                                     ))}
                                 </div>
-                            )}
+                            ) : null}
                         </div>
                     </div>
                 </DialogContent>
             </Dialog>
+
+            {/* Toast notification */}
+            {showToast && (
+                <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-2">
+                    <Alert className="bg-zinc-900 border-zinc-700">
+                        <AlertDescription>Review submitted successfully!</AlertDescription>
+                    </Alert>
+                </div>
+            )}
 
             {/* Image Lightbox - rendered via portal to avoid Dialog event conflicts */}
             {lightboxImage && typeof document !== 'undefined' && createPortal(

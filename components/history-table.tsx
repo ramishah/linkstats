@@ -142,6 +142,7 @@ export function HistoryTable({ links, friends, significantLocations = [] }: { li
 
             <ViewLinkDialog
                 link={selectedLink}
+                friends={friends}
                 significantLocations={significantLocations}
                 open={!!selectedLink}
                 onOpenChange={(open) => !open && setSelectedLink(null)}
