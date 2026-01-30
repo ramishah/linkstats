@@ -3,54 +3,24 @@
 import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+import { AddFlopDialog } from "@/components/add-flop-dialog"
+import { UnifiedFlop } from "@/lib/types"
 
-type Flop = {
-    link_date: string
-    purpose: string
-    reason: string | null
-}
-
-type FriendFlops = {
-    id: string
-    name: string
-    flops: Flop[]
-}
-
-export function FlopWall({ friends, allFlops }: { friends: any[], allFlops: any[] }) {
+export function FlopWall({ friends, allFlops }: { friends: any[], allFlops: UnifiedFlop[] }) {
     const [selectedFriend, setSelectedFriend] = useState<string>('all')
 
-    // Process data to group flops by friend
-    const friendFlops: Record<string, Flop[]> = {}
-
-    allFlops.forEach(flop => {
-        if (!friendFlops[flop.profile_id]) {
-            friendFlops[flop.profile_id] = []
-        }
-        friendFlops[flop.profile_id].push({
-            link_date: flop.links.date,
-            purpose: flop.links.purpose,
-            reason: flop.flop_reason
-        })
-    })
-
     const filteredFlops = selectedFriend === 'all'
-        ? allFlops.map(f => ({
-            name: f.profiles.name,
-            link_date: f.links.date,
-            purpose: f.links.purpose,
-            reason: f.flop_reason
-        }))
-        : friendFlops[selectedFriend]?.map(f => ({
-            name: friends.find(fr => fr.id === selectedFriend)?.name,
-            ...f
-        })) || []
+        ? allFlops
+        : allFlops.filter(f => f.profile_id === selectedFriend)
 
     return (
         <Card className="h-full flex flex-col">
             <CardHeader>
                 <div className="flex items-center justify-between">
                     <CardTitle>Flop Wall of Shame</CardTitle>
-                    <div className="flex-1 flex justify-end">
+                    <div className="flex items-center gap-2">
+                        <AddFlopDialog friends={friends} />
                         <Select value={selectedFriend} onValueChange={setSelectedFriend}>
                             <SelectTrigger className="w-auto text-right justify-end gap-2 px-3">
                                 <SelectValue placeholder="Select Member" />
@@ -70,13 +40,22 @@ export function FlopWall({ friends, allFlops }: { friends: any[], allFlops: any[
                     {filteredFlops.length === 0 ? (
                         <p className="text-muted-foreground text-sm text-center py-8">No flops recorded... yet.</p>
                     ) : (
-                        filteredFlops.map((item: any, idx: number) => (
+                        filteredFlops.map((item: UnifiedFlop, idx: number) => (
                             <div key={idx} className="border-b last:border-0 pb-3 last:pb-0">
                                 <div className="flex justify-between items-start mb-1">
-                                    <span className="font-semibold text-destructive">{item.name}</span>
-                                    <span className="text-xs text-muted-foreground">{new Date(item.link_date).toLocaleDateString()}</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-semibold text-destructive">{item.name}</span>
+                                        {item.is_link_ender && (
+                                            <Badge variant="destructive" className="text-xs">LINK ENDER</Badge>
+                                        )}
+                                    </div>
+                                    <span className="text-xs text-muted-foreground">
+                                        {item.flop_date ? new Date(item.flop_date).toLocaleDateString() : 'Unknown date'}
+                                    </span>
                                 </div>
-                                <p className="text-sm font-medium">{item.purpose}</p>
+                                <p className="text-sm font-medium">
+                                    {item.is_standalone ? 'Standalone flop' : item.purpose || 'Unknown activity'}
+                                </p>
                                 {item.reason && (
                                     <p className="text-sm text-muted-foreground mt-1 italic">Flop Reason: "{item.reason}"</p>
                                 )}

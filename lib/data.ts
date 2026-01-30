@@ -1,6 +1,6 @@
 import { cache } from 'react'
 import { supabase } from './supabase'
-import { FlattenedLinkLocation } from './types'
+import { FlattenedLinkLocation, UnifiedFlop } from './types'
 
 // Wrap data fetching functions with React cache() to deduplicate calls within a request
 export const getFriends = cache(async function getFriends() {
@@ -130,30 +130,81 @@ export const getDashboardStats = cache(async function getDashboardStats() {
     }
 })
 
-export async function getFlops() {
-    const { data, error } = await supabase
+export async function getFlops(): Promise<UnifiedFlop[]> {
+    // Fetch flops from link_members (attached to links)
+    const { data: linkMemberFlops, error: linkMemberError } = await supabase
         .from('link_members')
         .select(`
-      profile_id,
-      flop_reason,
-      profiles (name),
-      links (id, purpose, date)
-    `)
+            profile_id,
+            flop_reason,
+            profiles (name),
+            links (id, purpose, date)
+        `)
         .eq('is_flop', true)
-        .order('created_at', { ascending: false })
 
-    if (error) {
-        console.error('Error fetching flops:', error)
-        return []
+    if (linkMemberError) {
+        console.error('Error fetching link_member flops:', linkMemberError)
     }
 
-    // Flatten the structure for easier consumption
-    return data.map((item: any) => ({
-        ...item,
-        name: item.profiles?.name,
-        link_date: item.links?.date,
-        purpose: item.links?.purpose
-    }))
+    // Fetch standalone flops from the flops table
+    const { data: standaloneFlops, error: standaloneError } = await supabase
+        .from('flops')
+        .select(`
+            profile_id,
+            flop_date,
+            reason,
+            is_link_ender,
+            link_id,
+            profiles (name),
+            links (purpose, date)
+        `)
+
+    if (standaloneError) {
+        console.error('Error fetching standalone flops:', standaloneError)
+    }
+
+    // Unify the data
+    const unified: UnifiedFlop[] = []
+
+    // Add link_member flops
+    if (linkMemberFlops) {
+        for (const item of linkMemberFlops as any[]) {
+            unified.push({
+                profile_id: item.profile_id,
+                name: item.profiles?.name || 'Unknown',
+                flop_date: item.links?.date || '',
+                purpose: item.links?.purpose || null,
+                reason: item.flop_reason || null,
+                is_link_ender: false,
+                is_standalone: false
+            })
+        }
+    }
+
+    // Add standalone flops (from flops table)
+    if (standaloneFlops) {
+        for (const item of standaloneFlops as any[]) {
+            // Only add if it's truly standalone (no link_id) or has a link_id
+            unified.push({
+                profile_id: item.profile_id,
+                name: item.profiles?.name || 'Unknown',
+                flop_date: item.link_id ? item.links?.date : item.flop_date,
+                purpose: item.link_id ? item.links?.purpose : null,
+                reason: item.reason || null,
+                is_link_ender: item.is_link_ender || false,
+                is_standalone: !item.link_id
+            })
+        }
+    }
+
+    // Sort by date descending
+    unified.sort((a, b) => {
+        const dateA = a.flop_date ? new Date(a.flop_date).getTime() : 0
+        const dateB = b.flop_date ? new Date(b.flop_date).getTime() : 0
+        return dateB - dateA
+    })
+
+    return unified
 }
 
 export async function getLinksWithLocations(): Promise<FlattenedLinkLocation[]> {

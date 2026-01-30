@@ -18,3 +18,13 @@ export interface FlattenedLinkLocation {
     location_lng: number
     date: string
 }
+
+export interface UnifiedFlop {
+    profile_id: string
+    name: string
+    flop_date: string
+    purpose: string | null
+    reason: string | null
+    is_link_ender: boolean
+    is_standalone: boolean
+}

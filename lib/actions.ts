@@ -306,3 +306,29 @@ export async function deleteLinkImage(imageId: string, storagePath: string) {
     revalidatePath('/history')
     return { success: true }
 }
+
+export async function createStandaloneFlop(
+    profileId: string,
+    flopDate: string,
+    reason?: string,
+    isLinkEnder: boolean = false
+) {
+    const { data, error } = await supabase
+        .from('flops')
+        .insert({
+            profile_id: profileId,
+            flop_date: new Date(flopDate).toISOString(),
+            reason: reason || null,
+            is_link_ender: isLinkEnder
+        })
+        .select('id')
+        .single()
+
+    if (error) {
+        console.error('Error creating standalone flop:', error)
+        throw new Error('Failed to create flop')
+    }
+
+    revalidatePath('/')
+    return { success: true, id: data.id }
+}
