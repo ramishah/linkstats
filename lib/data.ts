@@ -44,18 +44,20 @@ export async function getRecentLinks() {
 
 export const getDashboardStats = cache(async function getDashboardStats() {
     // Fetch all data in parallel for better performance
-    const [linksResult, membersResult, activeFriendsResult] = await Promise.all([
+    const [linksResult, membersResult, activeFriendsResult, standaloneFlopsResult] = await Promise.all([
         supabase.from('links').select('duration_minutes, created_at'),
         supabase.from('link_members').select('is_flop, profile_id, profiles(name, is_active)'),
-        supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('is_active', true)
+        supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('is_active', true),
+        supabase.from('flops').select('profile_id, profiles(name, is_active)')
     ])
 
     const { data: links, error: linksError } = linksResult
     const { data: members, error: membersError } = membersResult
     const { count: activeFriendsCount, error: activeFriendsError } = activeFriendsResult
+    const { data: standaloneFlops, error: standaloneFlopsError } = standaloneFlopsResult
 
-    if (linksError || membersError || activeFriendsError) {
-        console.error('Error fetching stats data', linksError, membersError, activeFriendsError)
+    if (linksError || membersError || activeFriendsError || standaloneFlopsError) {
+        console.error('Error fetching stats data', linksError, membersError, activeFriendsError, standaloneFlopsError)
         return {
             totalLinks: 0,
             avgDuration: 0,
@@ -86,7 +88,7 @@ export const getDashboardStats = cache(async function getDashboardStats() {
         ? Math.round((totalActiveAttendees / totalPossibleAttendance) * 100)
         : 0
 
-    // Calculate top flopper
+    // Calculate top flopper from link_members
     const flopsByPerson: Record<string, number> = {}
     activeMembersHistory.forEach(m => {
         // @ts-ignore
@@ -96,6 +98,16 @@ export const getDashboardStats = cache(async function getDashboardStats() {
             flopsByPerson[name] = (flopsByPerson[name] || 0) + 1
         }
     })
+
+    // Add standalone flops to the count
+    if (standaloneFlops) {
+        standaloneFlops.forEach((f: any) => {
+            if (f.profiles?.is_active !== false && f.profiles?.name) {
+                const name = f.profiles.name
+                flopsByPerson[name] = (flopsByPerson[name] || 0) + 1
+            }
+        })
+    }
 
     let topFlopper = 'None'
     let maxFlops = 0
