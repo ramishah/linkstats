@@ -25,12 +25,19 @@ import { Plus, Check, AlertCircle, Trash2, Pencil } from 'lucide-react'
 import { formatAddress } from '@/lib/utils'
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 
+interface LinkLocation {
+    location_name: string
+    location_lat: number
+    location_lng: number
+}
+
 interface ManageSignificantLocationsDialogProps {
     distinctLocations: string[]
     significantLocations: any[]
+    linkLocations?: LinkLocation[]
 }
 
-export function ManageSignificantLocationsDialog({ distinctLocations, significantLocations }: ManageSignificantLocationsDialogProps) {
+export function ManageSignificantLocationsDialog({ distinctLocations, significantLocations, linkLocations = [] }: ManageSignificantLocationsDialogProps) {
     const [open, setOpen] = useState(false)
     const [selectedAddress, setSelectedAddress] = useState('')
     const [label, setLabel] = useState('')
@@ -58,16 +65,21 @@ export function ManageSignificantLocationsDialog({ distinctLocations, significan
             return
         }
 
+        // Look up coordinates from link_locations
+        const matchingLocation = linkLocations.find(loc => loc.location_name === selectedAddress)
+        const lat = matchingLocation?.location_lat
+        const lng = matchingLocation?.location_lng
+
         setIsSubmitting(true)
         try {
             if (isEditMode) {
-                await updateSignificantLocation(selectedAddress, label)
+                await updateSignificantLocation(selectedAddress, label, lat, lng)
                 setFeedback({
                     type: 'success',
                     message: `Updated location to "${label}"`
                 })
             } else {
-                await createSignificantLocation(selectedAddress, label)
+                await createSignificantLocation(selectedAddress, label, lat, lng)
                 setFeedback({
                     type: 'success',
                     message: `Added "${label}" for ${formatAddress(selectedAddress)}`

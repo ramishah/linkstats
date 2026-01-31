@@ -28,3 +28,20 @@ export interface UnifiedFlop {
     is_link_ender: boolean
     is_standalone: boolean
 }
+
+export interface SignificantLocation {
+    id: string
+    address: string
+    label: string
+    location_lat: number | null
+    location_lng: number | null
+    created_at: string
+}
+
+export interface LocationSearchResult {
+    type: 'saved' | 'mapbox'
+    label: string
+    address: string
+    lat: number
+    lng: number
+}

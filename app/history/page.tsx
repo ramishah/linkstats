@@ -1,4 +1,4 @@
-import { getRecentLinks, getFriends, getDistinctLocations, getSignificantLocations } from "@/lib/data"
+import { getRecentLinks, getFriends, getDistinctLocations, getSignificantLocations, getAllLinkLocations } from "@/lib/data"
 import { supabase } from "@/lib/supabase"
 import { HistoryTable } from "@/components/history-table"
 import { HistoryPageActions } from "@/components/history-page-actions"
@@ -46,10 +46,13 @@ async function getAllLinks() {
 export const revalidate = 0;
 
 export default async function HistoryPage() {
-    const links = await getAllLinks()
-    const friends = await getFriends()
-    const distinctLocations = await getDistinctLocations()
-    const significantLocations = await getSignificantLocations()
+    const [links, friends, distinctLocations, significantLocations, linkLocations] = await Promise.all([
+        getAllLinks(),
+        getFriends(),
+        getDistinctLocations(),
+        getSignificantLocations(),
+        getAllLinkLocations()
+    ])
 
     return (
         <div className="flex flex-col gap-6">
@@ -59,6 +62,7 @@ export default async function HistoryPage() {
                     friends={friends}
                     distinctLocations={distinctLocations}
                     significantLocations={significantLocations}
+                    linkLocations={linkLocations}
                 />
             </div>
             <HistoryTable links={links} friends={friends} significantLocations={significantLocations} />

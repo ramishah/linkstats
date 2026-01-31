@@ -1,7 +1,10 @@
-import { getFriends } from "@/lib/data"
+import { getFriends, getSignificantLocations } from "@/lib/data"
 import { AddLinkDialog } from "@/components/add-link-dialog"
 
 export async function AddLinkDialogWrapper() {
-    const friends = await getFriends()
-    return <AddLinkDialog friends={friends} />
+    const [friends, significantLocations] = await Promise.all([
+        getFriends(),
+        getSignificantLocations()
+    ])
+    return <AddLinkDialog friends={friends} significantLocations={significantLocations} />
 }

@@ -271,3 +271,24 @@ export const getDistinctLocations = cache(async function getDistinctLocations() 
     const uniqueLocations = Array.from(new Set(data.map(item => item.location_name)))
     return uniqueLocations as string[]
 })
+
+export const getAllLinkLocations = cache(async function getAllLinkLocations() {
+    const { data, error } = await supabase
+        .from('link_locations')
+        .select('location_name, location_lat, location_lng')
+
+    if (error) {
+        console.error('Error fetching link locations:', error)
+        return []
+    }
+
+    // Deduplicate by location_name, keeping first occurrence
+    const seen = new Set<string>()
+    const unique = data.filter(loc => {
+        if (seen.has(loc.location_name)) return false
+        seen.add(loc.location_name)
+        return true
+    })
+
+    return unique
+})

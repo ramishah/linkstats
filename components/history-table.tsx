@@ -123,7 +123,7 @@ export function HistoryTable({ links, friends, significantLocations = [] }: { li
                                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                         <div className="flex justify-end gap-1">
                                             <RateLinkDialog link={link} friends={friends} />
-                                            <EditLinkDialog link={link} friends={friends} />
+                                            <EditLinkDialog link={link} friends={friends} significantLocations={significantLocations} />
                                             <Button
                                                 variant="ghost"
                                                 size="icon"

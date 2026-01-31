@@ -178,12 +178,19 @@ export async function deleteLink(id: string) {
     revalidatePath('/history')
 }
 
-export async function createSignificantLocation(address: string, label: string) {
+export async function createSignificantLocation(
+    address: string,
+    label: string,
+    location_lat?: number,
+    location_lng?: number
+) {
     const { error } = await supabase
         .from('significant_locations')
         .insert({
             address,
             label,
+            location_lat,
+            location_lng,
         })
 
     if (error) {
@@ -192,13 +199,24 @@ export async function createSignificantLocation(address: string, label: string) 
     }
 
     revalidatePath('/history')
+    revalidatePath('/add')
+    revalidatePath('/')
     return { success: true }
 }
 
-export async function updateSignificantLocation(address: string, newLabel: string) {
+export async function updateSignificantLocation(
+    address: string,
+    newLabel: string,
+    location_lat?: number,
+    location_lng?: number
+) {
+    const updateData: { label: string; location_lat?: number; location_lng?: number } = { label: newLabel }
+    if (location_lat !== undefined) updateData.location_lat = location_lat
+    if (location_lng !== undefined) updateData.location_lng = location_lng
+
     const { error } = await supabase
         .from('significant_locations')
-        .update({ label: newLabel })
+        .update(updateData)
         .eq('address', address)
 
     if (error) {
@@ -207,6 +225,8 @@ export async function updateSignificantLocation(address: string, newLabel: strin
     }
 
     revalidatePath('/history')
+    revalidatePath('/add')
+    revalidatePath('/')
     return { success: true }
 }
 

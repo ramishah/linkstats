@@ -2,15 +2,15 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createLink, updateLink } from '@/lib/actions'
-import { searchLocations, type GeocodingResult } from '@/lib/geocoding'
+import { searchMapbox, searchSignificantLocations } from '@/lib/geocoding'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { format } from "date-fns"
-import { ChevronDownIcon, MapPin, Loader2, X } from "lucide-react"
-import { Location } from '@/lib/types'
+import { ChevronDownIcon, MapPin, Loader2, X, Star } from "lucide-react"
+import { Location, SignificantLocation, LocationSearchResult } from '@/lib/types'
 import { cn } from "@/lib/utils"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -20,9 +20,10 @@ interface LinkFormProps {
     initialData?: any
     isEdit?: boolean
     onSuccess?: () => void
+    significantLocations?: SignificantLocation[]
 }
 
-export function LinkForm({ friends, initialData, isEdit = false, onSuccess }: LinkFormProps) {
+export function LinkForm({ friends, initialData, isEdit = false, onSuccess, significantLocations = [] }: LinkFormProps) {
     // Parse initial members if editing
     const initialAttendees = new Set<string>(
         initialData?.link_members
@@ -82,30 +83,40 @@ export function LinkForm({ friends, initialData, isEdit = false, onSuccess }: Li
 
     // Location search input state
     const [locationInput, setLocationInput] = useState('')
-    const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null)
-    const [suggestions, setSuggestions] = useState<GeocodingResult[]>([])
+    const [savedResults, setSavedResults] = useState<LocationSearchResult[]>([])
+    const [mapboxResults, setMapboxResults] = useState<LocationSearchResult[]>([])
     const [isSearching, setIsSearching] = useState(false)
     const [showDropdown, setShowDropdown] = useState(false)
     const dropdownRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLInputElement>(null)
 
-    // Debounced search effect
+    // Search effect - handles both saved locations and Mapbox
     useEffect(() => {
-        if (!locationInput.trim() || locationInput.length < 3 || coordinates) {
-            setSuggestions([])
+        // Always filter saved locations (even on empty query for focus state)
+        const filteredSaved = searchSignificantLocations(locationInput, significantLocations)
+        setSavedResults(filteredSaved)
+
+        // If no input, show saved locations only (for focus state)
+        if (!locationInput.trim()) {
+            setMapboxResults([])
+            return
+        }
+
+        // Debounce Mapbox API calls
+        if (locationInput.length < 2) {
+            setMapboxResults([])
             return
         }
 
         const debounceTimer = setTimeout(async () => {
             setIsSearching(true)
-            const results = await searchLocations(locationInput)
-            setSuggestions(results)
-            setShowDropdown(results.length > 0)
+            const results = await searchMapbox(locationInput)
+            setMapboxResults(results)
             setIsSearching(false)
-        }, 400) // 400ms debounce
+        }, 400)
 
         return () => clearTimeout(debounceTimer)
-    }, [locationInput, coordinates])
+    }, [locationInput, significantLocations])
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -120,17 +131,17 @@ export function LinkForm({ friends, initialData, isEdit = false, onSuccess }: Li
         return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
 
-    const handleSelectLocation = (result: GeocodingResult) => {
+    const handleSelectLocation = (result: LocationSearchResult) => {
         // Add to locations array
         setLocations(prev => [...prev, {
-            location_name: result.display_name,
+            location_name: result.address,
             location_lat: result.lat,
             location_lng: result.lng
         }])
         // Clear input for next entry
         setLocationInput('')
-        setCoordinates(null)
-        setSuggestions([])
+        setSavedResults([])
+        setMapboxResults([])
         setShowDropdown(false)
     }
 
@@ -140,7 +151,16 @@ export function LinkForm({ friends, initialData, isEdit = false, onSuccess }: Li
 
     const handleLocationInputChange = (value: string) => {
         setLocationInput(value)
-        setCoordinates(null) // Clear coordinates when user types
+        setShowDropdown(true)
+    }
+
+    const handleInputFocus = () => {
+        // Show saved locations on focus
+        const filteredSaved = searchSignificantLocations('', significantLocations)
+        setSavedResults(filteredSaved)
+        if (filteredSaved.length > 0 || locationInput.trim()) {
+            setShowDropdown(true)
+        }
     }
 
     const handleFlopperChange = (id: string, checked: boolean) => {
@@ -160,6 +180,8 @@ export function LinkForm({ friends, initialData, isEdit = false, onSuccess }: Li
     }
 
     const action = isEdit ? updateLink.bind(null, initialData.id) : createLink
+
+    const hasResults = savedResults.length > 0 || mapboxResults.length > 0
 
     return (
         <Card className="max-w-4xl mx-auto">
@@ -304,10 +326,10 @@ export function LinkForm({ friends, initialData, isEdit = false, onSuccess }: Li
                                 <Input
                                     ref={inputRef}
                                     id="location"
-                                    placeholder="Search and add locations..."
+                                    placeholder="Search for a place or address..."
                                     value={locationInput}
                                     onChange={(e) => handleLocationInputChange(e.target.value)}
-                                    onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
+                                    onFocus={handleInputFocus}
                                     autoComplete="off"
                                     className="pr-10"
                                 />
@@ -320,24 +342,60 @@ export function LinkForm({ friends, initialData, isEdit = false, onSuccess }: Li
                                 </div>
                             </div>
 
-                            {showDropdown && suggestions.length > 0 && (
+                            {showDropdown && hasResults && (
                                 <div
                                     ref={dropdownRef}
-                                    className="absolute z-50 w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-md shadow-lg max-h-60 overflow-auto"
+                                    className="absolute z-50 w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-md shadow-lg max-h-72 overflow-auto"
                                 >
-                                    {suggestions.map((result, index) => (
-                                        <button
-                                            key={index}
-                                            type="button"
-                                            className="w-full px-3 py-2 text-left text-sm hover:bg-zinc-800 focus:bg-zinc-800 focus:outline-none border-b border-zinc-800 last:border-b-0"
-                                            onClick={() => handleSelectLocation(result)}
-                                        >
-                                            <div className="flex items-start gap-2">
-                                                <MapPin className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
-                                                <span className="line-clamp-2">{result.display_name}</span>
+                                    {/* Saved Locations Section */}
+                                    {savedResults.length > 0 && (
+                                        <div>
+                                            <div className="px-3 py-1.5 text-xs font-semibold text-zinc-400 uppercase tracking-wide bg-zinc-800/50 border-b border-zinc-700">
+                                                Saved Locations
                                             </div>
-                                        </button>
-                                    ))}
+                                            {savedResults.map((result, index) => (
+                                                <button
+                                                    key={`saved-${index}`}
+                                                    type="button"
+                                                    className="w-full px-3 py-2 text-left text-sm hover:bg-zinc-800 focus:bg-zinc-800 focus:outline-none border-b border-zinc-800 last:border-b-0"
+                                                    onClick={() => handleSelectLocation(result)}
+                                                >
+                                                    <div className="flex items-start gap-2">
+                                                        <Star className="h-4 w-4 mt-0.5 shrink-0 text-yellow-500 fill-yellow-500" />
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="font-medium truncate">{result.label}</div>
+                                                            <div className="text-xs text-zinc-400 truncate">{result.address}</div>
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Search Results Section */}
+                                    {mapboxResults.length > 0 && (
+                                        <div>
+                                            <div className="px-3 py-1.5 text-xs font-semibold text-zinc-400 uppercase tracking-wide bg-zinc-800/50 border-b border-zinc-700">
+                                                Search Results
+                                            </div>
+                                            {mapboxResults.map((result, index) => (
+                                                <button
+                                                    key={`mapbox-${index}`}
+                                                    type="button"
+                                                    className="w-full px-3 py-2 text-left text-sm hover:bg-zinc-800 focus:bg-zinc-800 focus:outline-none border-b border-zinc-800 last:border-b-0"
+                                                    onClick={() => handleSelectLocation(result)}
+                                                >
+                                                    <div className="flex items-start gap-2">
+                                                        <MapPin className="h-4 w-4 mt-0.5 shrink-0 text-blue-400" />
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="font-medium truncate">{result.label}</div>
+                                                            <div className="text-xs text-zinc-400 truncate">{result.address}</div>
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>

@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog"
 import { LinkForm } from "@/components/link-form"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
+import { SignificantLocation } from "@/lib/types"
 
 interface AddLinkDialogProps {
     friends: any[]
+    significantLocations?: SignificantLocation[]
 }
 
-export function AddLinkDialog({ friends }: AddLinkDialogProps) {
+export function AddLinkDialog({ friends, significantLocations = [] }: AddLinkDialogProps) {
     const [open, setOpen] = useState(false)
     const [showToast, setShowToast] = useState(false)
 
@@ -32,7 +34,7 @@ export function AddLinkDialog({ friends }: AddLinkDialogProps) {
                 <DialogContent className="max-w-4xl border-zinc-800 bg-zinc-950 p-0 overflow-hidden">
                     <DialogTitle className="sr-only">Log a New Link</DialogTitle>
                     <div className="max-h-[90vh] overflow-y-auto">
-                        <LinkForm friends={friends} onSuccess={handleSuccess} />
+                        <LinkForm friends={friends} onSuccess={handleSuccess} significantLocations={significantLocations} />
                     </div>
                 </DialogContent>
             </Dialog>

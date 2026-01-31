@@ -6,13 +6,15 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog"
 import { LinkForm } from "@/components/link-form"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
+import { SignificantLocation } from "@/lib/types"
 
 interface EditLinkDialogProps {
     link: any
     friends: any[]
+    significantLocations?: SignificantLocation[]
 }
 
-export function EditLinkDialog({ link, friends }: EditLinkDialogProps) {
+export function EditLinkDialog({ link, friends, significantLocations = [] }: EditLinkDialogProps) {
     const [open, setOpen] = useState(false)
     const [showToast, setShowToast] = useState(false)
 
@@ -33,7 +35,7 @@ export function EditLinkDialog({ link, friends }: EditLinkDialogProps) {
                 <DialogContent className="max-w-4xl border-zinc-800 bg-zinc-950 p-0 overflow-hidden">
                     <DialogTitle className="sr-only">Edit Link</DialogTitle>
                     <div className="max-h-[90vh] overflow-y-auto">
-                        <LinkForm friends={friends} initialData={link} isEdit={true} onSuccess={handleSuccess} />
+                        <LinkForm friends={friends} initialData={link} isEdit={true} onSuccess={handleSuccess} significantLocations={significantLocations} />
                     </div>
                 </DialogContent>
             </Dialog>
