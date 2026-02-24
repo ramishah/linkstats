@@ -9,6 +9,7 @@ interface LinkLocation {
     id: string
     purpose: string
     location_name: string
+    location_label?: string
     location_lat: number
     location_lng: number
     date: string
@@ -25,6 +26,7 @@ interface GroupedLocation {
     lat: number
     lng: number
     location_name: string
+    location_label?: string
     links: LinkLocation[]
 }
 
@@ -48,11 +50,16 @@ function groupLinksByLocation(links: LinkLocation[]): GroupedLocation[] {
 
         if (groups[key]) {
             groups[key].links.push(link)
+            // Prefer a label if any link at this location has one
+            if (!groups[key].location_label && link.location_label) {
+                groups[key].location_label = link.location_label
+            }
         } else {
             groups[key] = {
                 lat: link.location_lat,
                 lng: link.location_lng,
                 location_name: link.location_name,
+                location_label: link.location_label,
                 links: [link]
             }
         }
@@ -117,29 +124,37 @@ export function LocationMap({ links, significantLocations = [] }: LocationMapPro
                                 </div>
                             </MarkerContent>
                             <MarkerTooltip>
-                                {significantLocations?.find(l => l.address === group.location_name) ? (
-                                    <div className="flex items-center gap-2">
-                                        <Badge variant="outline" className="bg-background text-foreground border-foreground/20">
-                                            {significantLocations.find(l => l.address === group.location_name)!.label}
-                                        </Badge>
-                                        {group.links.length > 1 && <span className="text-xs">({group.links.length} links)</span>}
-                                    </div>
-                                ) : (
-                                    <>
-                                        {formatAddress(group.location_name)}
-                                        {group.links.length > 1 && ` (${group.links.length} links)`}
-                                    </>
-                                )}
+                                {(() => {
+                                    const label = group.location_label
+                                        || significantLocations?.find(l => l.address === group.location_name)?.label
+                                    return label ? (
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="outline" className="bg-background text-foreground border-foreground/20">
+                                                {label}
+                                            </Badge>
+                                            {group.links.length > 1 && <span className="text-xs">({group.links.length} links)</span>}
+                                        </div>
+                                    ) : (
+                                        <>
+                                            {formatAddress(group.location_name)}
+                                            {group.links.length > 1 && ` (${group.links.length} links)`}
+                                        </>
+                                    )
+                                })()}
                             </MarkerTooltip>
                             <MarkerPopup>
                                 <div className="space-y-2 max-h-48 overflow-y-auto">
-                                    {significantLocations?.find(l => l.address === group.location_name) ? (
-                                        <Badge variant="outline" className="mb-2 bg-background text-foreground border-foreground/20">
-                                            {significantLocations.find(l => l.address === group.location_name)!.label}
-                                        </Badge>
-                                    ) : (
-                                        <p className="text-xs text-muted-foreground font-medium">{formatAddress(group.location_name)}</p>
-                                    )}
+                                    {(() => {
+                                        const label = group.location_label
+                                            || significantLocations?.find(l => l.address === group.location_name)?.label
+                                        return label ? (
+                                            <Badge variant="outline" className="mb-2 bg-background text-foreground border-foreground/20">
+                                                {label}
+                                            </Badge>
+                                        ) : (
+                                            <p className="text-xs text-muted-foreground font-medium">{formatAddress(group.location_name)}</p>
+                                        )
+                                    })()}
                                     <div className="space-y-2">
                                         {group.links.map((link) => (
                                             <div key={link.id} className="border-t border-border pt-2 first:border-t-0 first:pt-0">

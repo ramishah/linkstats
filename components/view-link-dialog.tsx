@@ -288,9 +288,8 @@ export function ViewLinkDialog({ link, friends = [], significantLocations = [], 
                                 >
                                     <MapControls position="bottom-right" showZoom={true} />
                                     {locations.map((loc: any, i: number) => {
-                                        const sigLoc = localSignificantLocations?.find(
-                                            (sl: any) => sl.address === loc.location_name
-                                        )
+                                        const label = loc.location_label
+                                            || localSignificantLocations?.find((sl: any) => sl.address === loc.location_name)?.label
                                         return (
                                             <MapMarker
                                                 key={i}
@@ -301,9 +300,9 @@ export function ViewLinkDialog({ link, friends = [], significantLocations = [], 
                                                     <div className="size-4 rounded-full bg-primary border-2 border-white shadow-lg" />
                                                 </MarkerContent>
                                                 <MarkerTooltip>
-                                                    {sigLoc ? (
+                                                    {label ? (
                                                         <Badge variant="outline" className="bg-background text-foreground border-foreground/20">
-                                                            {sigLoc.label}
+                                                            {label}
                                                         </Badge>
                                                     ) : (
                                                         formatAddress(loc.location_name)
@@ -311,9 +310,9 @@ export function ViewLinkDialog({ link, friends = [], significantLocations = [], 
                                                 </MarkerTooltip>
                                                 <MarkerPopup>
                                                     <div className="space-y-1 max-w-[250px]">
-                                                        {sigLoc ? (
+                                                        {label ? (
                                                             <Badge variant="outline" className="bg-background text-foreground border-foreground/20">
-                                                                {sigLoc.label}
+                                                                {label}
                                                             </Badge>
                                                         ) : null}
                                                         <p className="text-xs text-muted-foreground break-words">
@@ -400,6 +399,7 @@ export function ViewLinkDialog({ link, friends = [], significantLocations = [], 
                                             const sigLoc = localSignificantLocations?.find(
                                                 (sl: any) => sl.address === loc.location_name
                                             )
+                                            const displayLabel = loc.location_label || sigLoc?.label
                                             return (
                                                 <Popover
                                                     key={i}
@@ -418,8 +418,13 @@ export function ViewLinkDialog({ link, friends = [], significantLocations = [], 
                                                         <button className="inline-flex items-center gap-1 hover:opacity-70 transition-opacity">
                                                             {sigLoc ? (
                                                                 <Badge variant="outline" className="font-normal cursor-pointer">
-                                                                    {sigLoc.label}
+                                                                    {displayLabel}
                                                                     <Pencil className="h-3 w-3 ml-1 opacity-50" />
+                                                                </Badge>
+                                                            ) : displayLabel ? (
+                                                                <Badge variant="secondary" className="font-normal cursor-pointer">
+                                                                    {displayLabel}
+                                                                    <Plus className="h-3 w-3 ml-1 opacity-50" />
                                                                 </Badge>
                                                             ) : (
                                                                 <Badge variant="secondary" className="font-normal cursor-pointer">

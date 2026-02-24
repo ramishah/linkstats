@@ -38,6 +38,7 @@ export async function createLink(formData: FormData) {
         const locationRecords = locations.map(loc => ({
             link_id: link.id,
             location_name: loc.location_name,
+            location_label: loc.location_label || null,
             location_lat: loc.location_lat,
             location_lng: loc.location_lng
         }))
@@ -130,6 +131,7 @@ export async function updateLink(id: string, formData: FormData) {
         const locationRecords = locations.map(loc => ({
             link_id: id,
             location_name: loc.location_name,
+            location_label: loc.location_label || null,
             location_lat: loc.location_lat,
             location_lng: loc.location_lng
         }))

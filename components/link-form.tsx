@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { format } from "date-fns"
 import { ChevronDownIcon, MapPin, Loader2, X, Star } from "lucide-react"
 import { Location, SignificantLocation, LocationSearchResult } from '@/lib/types'
-import { cn } from "@/lib/utils"
+import { cn, formatAddress } from "@/lib/utils"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
@@ -76,6 +76,7 @@ export function LinkForm({ friends, initialData, isEdit = false, onSuccess, sign
     const [locations, setLocations] = useState<Location[]>(
         initialData?.link_locations?.map((loc: any) => ({
             location_name: loc.location_name,
+            location_label: loc.location_label || undefined,
             location_lat: loc.location_lat,
             location_lng: loc.location_lng
         })) || []
@@ -135,6 +136,7 @@ export function LinkForm({ friends, initialData, isEdit = false, onSuccess, sign
         // Add to locations array
         setLocations(prev => [...prev, {
             location_name: result.address,
+            location_label: result.label,
             location_lat: result.lat,
             location_lng: result.lng
         }])
@@ -304,7 +306,7 @@ export function LinkForm({ friends, initialData, isEdit = false, onSuccess, sign
                                     >
                                         <div className="flex items-center gap-2 flex-1 min-w-0">
                                             <MapPin className="h-4 w-4 text-green-500 shrink-0" />
-                                            <span className="text-sm truncate">{loc.location_name}</span>
+                                            <span className="text-sm truncate">{loc.location_label || formatAddress(loc.location_name)}</span>
                                         </div>
                                         <Button
                                             type="button"

@@ -17,6 +17,7 @@ async function getAllLinks() {
       link_locations (
         id,
         location_name,
+        location_label,
         location_lat,
         location_lng
       ),

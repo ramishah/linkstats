@@ -18,7 +18,7 @@ export async function RecentLinksList() {
                         recentLinks.map((link: any) => {
                             const locations = link.link_locations || []
                             const locationText = locations.length > 0
-                                ? locations.map((loc: any) => formatAddress(loc.location_name)).join(', ')
+                                ? locations.map((loc: any) => loc.location_label || formatAddress(loc.location_name)).join(', ')
                                 : 'Unknown'
                             return (
                                 <div key={link.id} className="flex items-center justify-between gap-4">

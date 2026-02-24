@@ -79,12 +79,11 @@ export function HistoryTable({ links, friends, significantLocations = [] }: { li
                                         {linkLocations.length > 0 ? (
                                             <div className="flex flex-wrap gap-1">
                                                 {linkLocations.map((loc: any, i: number) => {
-                                                    const sigLoc = significantLocations?.find(
-                                                        (sl: any) => sl.address === loc.location_name
-                                                    )
-                                                    return sigLoc ? (
+                                                    const label = loc.location_label
+                                                        || significantLocations?.find((sl: any) => sl.address === loc.location_name)?.label
+                                                    return label ? (
                                                         <Badge key={i} variant="outline" className="font-normal">
-                                                            {sigLoc.label}
+                                                            {label}
                                                         </Badge>
                                                     ) : (
                                                         <span key={i} className="text-sm">

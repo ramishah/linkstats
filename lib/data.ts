@@ -28,6 +28,7 @@ export async function getRecentLinks() {
       ),
       link_locations (
         location_name,
+        location_label,
         location_lat,
         location_lng
       )
@@ -228,6 +229,7 @@ export async function getLinksWithLocations(): Promise<FlattenedLinkLocation[]> 
             date,
             link_locations (
                 location_name,
+                location_label,
                 location_lat,
                 location_lng
             )
@@ -247,6 +249,7 @@ export async function getLinksWithLocations(): Promise<FlattenedLinkLocation[]> 
                 id: link.id,
                 purpose: link.purpose,
                 location_name: loc.location_name,
+                location_label: loc.location_label || undefined,
                 location_lat: loc.location_lat,
                 location_lng: loc.location_lng,
                 date: link.date
@@ -287,7 +290,7 @@ export const getDistinctLocations = cache(async function getDistinctLocations() 
 export const getAllLinkLocations = cache(async function getAllLinkLocations() {
     const { data, error } = await supabase
         .from('link_locations')
-        .select('location_name, location_lat, location_lng')
+        .select('location_name, location_label, location_lat, location_lng')
 
     if (error) {
         console.error('Error fetching link locations:', error)
