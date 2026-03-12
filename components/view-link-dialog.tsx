@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { createPortal } from "react-dom"
-import { Star, MapPin, Clock, Users, Plus, X, ImageIcon, Pencil } from "lucide-react"
+import { Star, MapPin, Clock, Users, Plus, X, ImageIcon, Pencil, Play, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle, DialogHeader } from "@/components/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Badge } from "@/components/ui/badge"
@@ -15,6 +15,10 @@ import { saveLinkImage, deleteLinkImage, createSignificantLocation, updateSignif
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
+// Client-side cache for plink media (avoids re-fetching on every dialog open)
+const plinkMediaCache = new Map<string, { data: any[]; fetchedAt: number }>()
+const PLINK_CACHE_TTL = 10 * 60 * 1000 // 10 minutes (presigned URLs expire after ~15min)
 
 interface ViewLinkDialogProps {
     link: any
@@ -70,7 +74,8 @@ function InteractiveStarRating({ rating, onRatingChange }: { rating: number, onR
 
 export function ViewLinkDialog({ link, friends = [], significantLocations = [], open, onOpenChange }: ViewLinkDialogProps) {
     const [isUploading, setIsUploading] = useState(false)
-    const [lightboxImage, setLightboxImage] = useState<string | null>(null)
+    const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+    const [lightboxLoading, setLightboxLoading] = useState(false)
     const [images, setImages] = useState<any[]>([])
     const [editingLocation, setEditingLocation] = useState<string | null>(null)
     const [labelInput, setLabelInput] = useState("")
@@ -85,6 +90,36 @@ export function ViewLinkDialog({ link, friends = [], significantLocations = [], 
     const [reviewComment, setReviewComment] = useState("")
     const [reviewProfileId, setReviewProfileId] = useState("")
     const [isSubmittingReview, setIsSubmittingReview] = useState(false)
+
+    // Plink media state
+    const [plinkMedia, setPlinkMedia] = useState<any[]>([])
+    const [plinkLoading, setPlinkLoading] = useState(false)
+
+    // Fetch plink media when dialog opens and link has plink_link_id (with caching)
+    useEffect(() => {
+        if (!open || !link?.plink_link_id) {
+            setPlinkMedia([])
+            return
+        }
+
+        const cached = plinkMediaCache.get(link.plink_link_id)
+        if (cached && Date.now() - cached.fetchedAt < PLINK_CACHE_TTL) {
+            setPlinkMedia(cached.data)
+            return
+        }
+
+        setPlinkLoading(true)
+        fetch(`/api/plink/media/${link.plink_link_id}`)
+            .then(res => res.json())
+            .then(data => {
+                if (Array.isArray(data)) {
+                    plinkMediaCache.set(link.plink_link_id, { data, fetchedAt: Date.now() })
+                    setPlinkMedia(data)
+                }
+            })
+            .catch(err => console.error('Failed to fetch plink media:', err))
+            .finally(() => setPlinkLoading(false))
+    }, [open, link?.plink_link_id])
 
     // Sync images when link changes or dialog opens
     useEffect(() => {
@@ -103,7 +138,7 @@ export function ViewLinkDialog({ link, friends = [], significantLocations = [], 
     // Reset lightbox and review form when dialog closes
     useEffect(() => {
         if (!open) {
-            setLightboxImage(null)
+            setLightboxIndex(null)
             setShowReviewForm(false)
             setReviewRating(0)
             setReviewComment("")
@@ -166,6 +201,38 @@ export function ViewLinkDialog({ link, friends = [], significantLocations = [], 
     const getImageUrl = (storagePath: string) => {
         return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/link-images/${storagePath}`
     }
+
+    // Build combined lightbox media array: local images first, then all plink media
+    const allLightboxMedia: { url: string; type: 'image' | 'video' }[] = [
+        ...images.map((img: any) => ({ url: getImageUrl(img.storage_path), type: 'image' as const })),
+        ...plinkMedia.map((m: any) => ({
+            url: m.url,
+            type: (m.type === 'video' || m.mime?.startsWith('video/')) ? 'video' as const : 'image' as const,
+        })),
+    ]
+
+    // Keyboard navigation for lightbox
+    // Reset loading state when navigating to a new item
+    useEffect(() => {
+        if (lightboxIndex !== null) setLightboxLoading(true)
+    }, [lightboxIndex])
+
+    useEffect(() => {
+        if (lightboxIndex === null) return
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'ArrowLeft' && lightboxIndex > 0) {
+                setLightboxIndex(lightboxIndex - 1)
+            } else if (e.key === 'ArrowRight' && lightboxIndex < allLightboxMedia.length - 1) {
+                setLightboxIndex(lightboxIndex + 1)
+            } else if (e.key === 'Escape') {
+                setLightboxIndex(null)
+            }
+        }
+
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [lightboxIndex, allLightboxMedia.length])
 
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -264,7 +331,15 @@ export function ViewLinkDialog({ link, friends = [], significantLocations = [], 
     return (
         <>
             <Dialog open={open} onOpenChange={onOpenChange}>
-                <DialogContent className="max-w-3xl border-zinc-800 bg-zinc-950 max-h-[90vh] overflow-y-auto">
+                <DialogContent
+                    className="max-w-3xl border-zinc-800 bg-zinc-950 max-h-[90vh] overflow-y-auto"
+                    onInteractOutside={(e) => {
+                        if (lightboxIndex !== null) e.preventDefault()
+                    }}
+                    onEscapeKeyDown={(e) => {
+                        if (lightboxIndex !== null) e.preventDefault()
+                    }}
+                >
                     <DialogHeader>
                         <DialogTitle className="flex items-center justify-between">
                             <span className="text-xl">{link.purpose}</span>
@@ -332,7 +407,7 @@ export function ViewLinkDialog({ link, friends = [], significantLocations = [], 
                             <div className="flex items-center justify-between mb-3">
                                 <h3 className="font-semibold flex items-center gap-2">
                                     <ImageIcon className="h-4 w-4" />
-                                    Photos ({images.length})
+                                    Photos ({images.length + plinkMedia.length})
                                 </h3>
                                 <Button
                                     variant="outline"
@@ -352,15 +427,15 @@ export function ViewLinkDialog({ link, friends = [], significantLocations = [], 
                                 />
                             </div>
 
-                            {images.length === 0 ? (
+                            {images.length === 0 && plinkMedia.length === 0 && !plinkLoading ? (
                                 <p className="text-sm text-muted-foreground">No photos yet.</p>
                             ) : (
                                 <div className="grid grid-cols-3 gap-2">
-                                    {images.map((image: any) => (
+                                    {images.map((image: any, idx: number) => (
                                         <div
                                             key={image.id}
                                             className="relative group aspect-square rounded-lg overflow-hidden border border-zinc-800 cursor-pointer"
-                                            onClick={() => setLightboxImage(getImageUrl(image.storage_path))}
+                                            onClick={() => setLightboxIndex(idx)}
                                         >
                                             <img
                                                 src={getImageUrl(image.storage_path)}
@@ -378,6 +453,54 @@ export function ViewLinkDialog({ link, friends = [], significantLocations = [], 
                                             </button>
                                         </div>
                                     ))}
+                                    {plinkMedia.map((media: any, idx: number) => {
+                                        const isVideo = media.type === 'video' || media.mime?.startsWith('video/')
+                                        const thumb = media.thumbnailUrl || media.url
+                                        const lightboxIdx = images.length + idx
+
+                                        return (
+                                            <div
+                                                key={`plink-${media.id}`}
+                                                className="relative group aspect-square rounded-lg overflow-hidden border border-zinc-800 cursor-pointer"
+                                                onClick={() => setLightboxIndex(lightboxIdx)}
+                                            >
+                                                {isVideo ? (
+                                                    <>
+                                                        {thumb ? (
+                                                            <img
+                                                                src={thumb}
+                                                                alt="Video"
+                                                                className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-full h-full bg-zinc-900 flex items-center justify-center">
+                                                                <Play className="h-8 w-8 text-zinc-500" />
+                                                            </div>
+                                                        )}
+                                                        <div className="absolute inset-0 flex items-center justify-center">
+                                                            <div className="bg-black/60 rounded-full p-2">
+                                                                <Play className="h-6 w-6 text-white fill-white" />
+                                                            </div>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <img
+                                                        src={media.url}
+                                                        alt="Plink photo"
+                                                        className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                                                    />
+                                                )}
+                                                <span className="absolute bottom-1 left-1 text-xs font-medium bg-black/70 text-zinc-200 px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    plink
+                                                </span>
+                                            </div>
+                                        )
+                                    })}
+                                    {plinkLoading && (
+                                        <div className="aspect-square rounded-lg border border-zinc-800 flex items-center justify-center">
+                                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -646,27 +769,71 @@ export function ViewLinkDialog({ link, friends = [], significantLocations = [], 
                 </div>
             )}
 
-            {/* Image Lightbox - rendered via portal to avoid Dialog event conflicts */}
-            {lightboxImage && typeof document !== 'undefined' && createPortal(
+            {/* Image/Video Lightbox - rendered via portal */}
+            {lightboxIndex !== null && allLightboxMedia[lightboxIndex] && typeof document !== 'undefined' && createPortal(
                 <div
-                    className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center"
-                    onClick={() => setLightboxImage(null)}
+                    className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center"
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) setLightboxIndex(null)
+                    }}
                 >
                     <button
-                        className="absolute top-4 right-4 p-2 bg-zinc-800 rounded-full hover:bg-zinc-700 transition-colors"
-                        onClick={(e) => {
-                            e.stopPropagation()
-                            setLightboxImage(null)
-                        }}
+                        className="absolute top-4 right-4 p-2 bg-zinc-800 rounded-full hover:bg-zinc-700 transition-colors z-10"
+                        onClick={() => setLightboxIndex(null)}
                     >
                         <X className="h-6 w-6 text-white" />
                     </button>
-                    <img
-                        src={lightboxImage}
-                        alt="Full size"
-                        className="max-w-[90vw] max-h-[90vh] object-contain"
-                        onClick={(e) => e.stopPropagation()}
-                    />
+
+                    {/* Left arrow */}
+                    {lightboxIndex > 0 && (
+                        <button
+                            className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full hover:bg-black/70 transition-colors z-10"
+                            onClick={() => setLightboxIndex(lightboxIndex - 1)}
+                        >
+                            <ChevronLeft className="h-6 w-6 text-white" />
+                        </button>
+                    )}
+
+                    {/* Right arrow */}
+                    {lightboxIndex < allLightboxMedia.length - 1 && (
+                        <button
+                            className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full hover:bg-black/70 transition-colors z-10"
+                            onClick={() => setLightboxIndex(lightboxIndex + 1)}
+                        >
+                            <ChevronRight className="h-6 w-6 text-white" />
+                        </button>
+                    )}
+
+                    {lightboxLoading && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <Loader2 className="h-8 w-8 animate-spin text-white/70" />
+                        </div>
+                    )}
+
+                    {allLightboxMedia[lightboxIndex].type === 'video' ? (
+                        <video
+                            key={lightboxIndex}
+                            src={allLightboxMedia[lightboxIndex].url}
+                            controls
+                            autoPlay
+                            className={`max-w-[90vw] max-h-[90vh] object-contain transition-opacity ${lightboxLoading ? 'opacity-0' : 'opacity-100'}`}
+                            onCanPlay={() => setLightboxLoading(false)}
+                        />
+                    ) : (
+                        <img
+                            src={allLightboxMedia[lightboxIndex].url}
+                            alt="Full size"
+                            className={`max-w-[90vw] max-h-[90vh] object-contain transition-opacity ${lightboxLoading ? 'opacity-0' : 'opacity-100'}`}
+                            onLoad={() => setLightboxLoading(false)}
+                        />
+                    )}
+
+                    {/* Media counter */}
+                    {allLightboxMedia.length > 1 && (
+                        <span className="absolute bottom-4 left-1/2 -translate-x-1/2 text-sm text-white/70 bg-black/50 px-3 py-1 rounded-full">
+                            {lightboxIndex + 1} / {allLightboxMedia.length}
+                        </span>
+                    )}
                 </div>,
                 document.body
             )}

@@ -15,6 +15,7 @@ import {
 import { Trash2, Star } from 'lucide-react'
 import { EditLinkDialog } from '@/components/edit-link-dialog'
 import { RateLinkDialog } from '@/components/rate-link-dialog'
+import { ConnectPlinkDialog } from '@/components/connect-plink-dialog'
 import { ViewLinkDialog } from '@/components/view-link-dialog'
 import { formatAddress } from '@/lib/utils'
 
@@ -121,6 +122,7 @@ export function HistoryTable({ links, friends, significantLocations = [] }: { li
                                     </TableCell>
                                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                         <div className="flex justify-end gap-1">
+                                            <ConnectPlinkDialog link={link} />
                                             <RateLinkDialog link={link} friends={friends} />
                                             <EditLinkDialog link={link} friends={friends} significantLocations={significantLocations} />
                                             <Button

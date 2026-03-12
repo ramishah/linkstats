@@ -329,6 +329,21 @@ export async function deleteLinkImage(imageId: string, storagePath: string) {
     return { success: true }
 }
 
+export async function connectPlinkLink(linkId: string, plinkLinkId: string | null) {
+    const { error } = await supabase
+        .from('links')
+        .update({ plink_link_id: plinkLinkId })
+        .eq('id', linkId)
+
+    if (error) {
+        console.error('Error connecting plink link:', error)
+        throw new Error('Failed to connect plink link')
+    }
+
+    revalidatePath('/history')
+    return { success: true }
+}
+
 export async function createStandaloneFlop(
     profileId: string,
     flopDate: string,
