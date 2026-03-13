@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { createPortal } from "react-dom"
-import { Star, MapPin, Clock, Users, Plus, X, ImageIcon, Pencil, Play, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
+import { Star, MapPin, Clock, Users, Plus, X, ImageIcon, Pencil, Play, Loader2 } from "lucide-react"
+import { Lightbox } from "@/components/ui/lightbox"
 import { Dialog, DialogContent, DialogTitle, DialogHeader } from "@/components/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Badge } from "@/components/ui/badge"
@@ -75,7 +75,6 @@ function InteractiveStarRating({ rating, onRatingChange }: { rating: number, onR
 export function ViewLinkDialog({ link, friends = [], significantLocations = [], open, onOpenChange }: ViewLinkDialogProps) {
     const [isUploading, setIsUploading] = useState(false)
     const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
-    const [lightboxLoading, setLightboxLoading] = useState(false)
     const [images, setImages] = useState<any[]>([])
     const [editingLocation, setEditingLocation] = useState<string | null>(null)
     const [labelInput, setLabelInput] = useState("")
@@ -211,28 +210,6 @@ export function ViewLinkDialog({ link, friends = [], significantLocations = [], 
         })),
     ]
 
-    // Keyboard navigation for lightbox
-    // Reset loading state when navigating to a new item
-    useEffect(() => {
-        if (lightboxIndex !== null) setLightboxLoading(true)
-    }, [lightboxIndex])
-
-    useEffect(() => {
-        if (lightboxIndex === null) return
-
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'ArrowLeft' && lightboxIndex > 0) {
-                setLightboxIndex(lightboxIndex - 1)
-            } else if (e.key === 'ArrowRight' && lightboxIndex < allLightboxMedia.length - 1) {
-                setLightboxIndex(lightboxIndex + 1)
-            } else if (e.key === 'Escape') {
-                setLightboxIndex(null)
-            }
-        }
-
-        window.addEventListener('keydown', handleKeyDown)
-        return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [lightboxIndex, allLightboxMedia.length])
 
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -769,73 +746,14 @@ export function ViewLinkDialog({ link, friends = [], significantLocations = [], 
                 </div>
             )}
 
-            {/* Image/Video Lightbox - rendered via portal */}
-            {lightboxIndex !== null && allLightboxMedia[lightboxIndex] && typeof document !== 'undefined' && createPortal(
-                <div
-                    className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center"
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget) setLightboxIndex(null)
-                    }}
-                >
-                    <button
-                        className="absolute top-4 right-4 p-2 bg-zinc-800 rounded-full hover:bg-zinc-700 transition-colors z-10"
-                        onClick={() => setLightboxIndex(null)}
-                    >
-                        <X className="h-6 w-6 text-white" />
-                    </button>
-
-                    {/* Left arrow */}
-                    {lightboxIndex > 0 && (
-                        <button
-                            className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full hover:bg-black/70 transition-colors z-10"
-                            onClick={() => setLightboxIndex(lightboxIndex - 1)}
-                        >
-                            <ChevronLeft className="h-6 w-6 text-white" />
-                        </button>
-                    )}
-
-                    {/* Right arrow */}
-                    {lightboxIndex < allLightboxMedia.length - 1 && (
-                        <button
-                            className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full hover:bg-black/70 transition-colors z-10"
-                            onClick={() => setLightboxIndex(lightboxIndex + 1)}
-                        >
-                            <ChevronRight className="h-6 w-6 text-white" />
-                        </button>
-                    )}
-
-                    {lightboxLoading && (
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <Loader2 className="h-8 w-8 animate-spin text-white/70" />
-                        </div>
-                    )}
-
-                    {allLightboxMedia[lightboxIndex].type === 'video' ? (
-                        <video
-                            key={lightboxIndex}
-                            src={allLightboxMedia[lightboxIndex].url}
-                            controls
-                            autoPlay
-                            className={`max-w-[90vw] max-h-[90vh] object-contain transition-opacity ${lightboxLoading ? 'opacity-0' : 'opacity-100'}`}
-                            onCanPlay={() => setLightboxLoading(false)}
-                        />
-                    ) : (
-                        <img
-                            src={allLightboxMedia[lightboxIndex].url}
-                            alt="Full size"
-                            className={`max-w-[90vw] max-h-[90vh] object-contain transition-opacity ${lightboxLoading ? 'opacity-0' : 'opacity-100'}`}
-                            onLoad={() => setLightboxLoading(false)}
-                        />
-                    )}
-
-                    {/* Media counter */}
-                    {allLightboxMedia.length > 1 && (
-                        <span className="absolute bottom-4 left-1/2 -translate-x-1/2 text-sm text-white/70 bg-black/50 px-3 py-1 rounded-full">
-                            {lightboxIndex + 1} / {allLightboxMedia.length}
-                        </span>
-                    )}
-                </div>,
-                document.body
+            {/* Image/Video Lightbox */}
+            {lightboxIndex !== null && (
+                <Lightbox
+                    media={allLightboxMedia}
+                    currentIndex={lightboxIndex}
+                    onClose={() => setLightboxIndex(null)}
+                    onNavigate={setLightboxIndex}
+                />
             )}
         </>
     )

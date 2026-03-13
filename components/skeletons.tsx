@@ -113,6 +113,23 @@ export function MemberStatusSkeleton() {
     )
 }
 
+export function RecentMediaSkeleton() {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle><Skeleton className="h-6 w-[140px]" /></CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {Array.from({ length: 12 }).map((_, i) => (
+                        <Skeleton key={i} className="aspect-square w-full rounded-lg" />
+                    ))}
+                </div>
+            </CardContent>
+        </Card>
+    )
+}
+
 export function MapSkeleton() {
     return (
         <Card className="h-full">

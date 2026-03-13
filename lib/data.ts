@@ -260,6 +260,27 @@ export async function getLinksWithLocations(): Promise<FlattenedLinkLocation[]> 
     return flattened
 }
 
+export const getRecentMedia = cache(async function getRecentMedia(limit = 12) {
+    const { data, error } = await supabase
+        .from('link_images')
+        .select(`
+            id,
+            storage_path,
+            file_name,
+            created_at,
+            links (id, purpose, date)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(limit)
+
+    if (error) {
+        console.error('Error fetching recent media:', error)
+        return []
+    }
+
+    return data
+})
+
 export const getSignificantLocations = cache(async function getSignificantLocations() {
     const { data, error } = await supabase
         .from('significant_locations')
