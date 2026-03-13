@@ -281,6 +281,22 @@ export const getRecentMedia = cache(async function getRecentMedia(limit = 12) {
     return data
 })
 
+export const getRecentPlinkLinks = cache(async function getRecentPlinkLinks(limit = 4) {
+    const { data, error } = await supabase
+        .from('links')
+        .select('id, date, purpose, plink_link_id')
+        .not('plink_link_id', 'is', null)
+        .order('date', { ascending: false })
+        .limit(limit)
+
+    if (error) {
+        console.error('Error fetching recent plink links:', error)
+        return []
+    }
+
+    return data as { id: string; date: string; purpose: string | null; plink_link_id: string }[]
+})
+
 export const getSignificantLocations = cache(async function getSignificantLocations() {
     const { data, error } = await supabase
         .from('significant_locations')
