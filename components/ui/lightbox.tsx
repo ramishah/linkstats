@@ -90,6 +90,10 @@ export function Lightbox({ media, currentIndex, onClose, onNavigate }: LightboxP
                     autoPlay
                     className={`max-w-[90vw] max-h-[90vh] object-contain transition-opacity ${loading ? 'opacity-0' : 'opacity-100'}`}
                     onCanPlay={() => setLoading(false)}
+                    onError={(e) => {
+                        console.error('[Lightbox] Video load error:', media[currentIndex].url.substring(0, 80))
+                        setLoading(false)
+                    }}
                 />
             ) : (
                 <img
@@ -97,6 +101,10 @@ export function Lightbox({ media, currentIndex, onClose, onNavigate }: LightboxP
                     alt="Full size"
                     className={`max-w-[90vw] max-h-[90vh] object-contain transition-opacity ${loading ? 'opacity-0' : 'opacity-100'}`}
                     onLoad={() => setLoading(false)}
+                    onError={(e) => {
+                        console.error('[Lightbox] Image load error:', media[currentIndex].url.substring(0, 80))
+                        setLoading(false)
+                    }}
                 />
             )}
 

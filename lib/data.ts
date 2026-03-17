@@ -260,7 +260,7 @@ export async function getLinksWithLocations(): Promise<FlattenedLinkLocation[]> 
     return flattened
 }
 
-export const getRecentMedia = cache(async function getRecentMedia(limit = 12) {
+export const getRecentMedia = cache(async function getRecentMedia(limit = 32) {
     const { data, error } = await supabase
         .from('link_images')
         .select(`
@@ -281,7 +281,7 @@ export const getRecentMedia = cache(async function getRecentMedia(limit = 12) {
     return data
 })
 
-export const getRecentPlinkLinks = cache(async function getRecentPlinkLinks(limit = 4) {
+export const getRecentPlinkLinks = cache(async function getRecentPlinkLinks(limit = 8) {
     const { data, error } = await supabase
         .from('links')
         .select('id, date, purpose, plink_link_id')

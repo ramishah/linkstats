@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { ImageIcon, Play } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Lightbox, type LightboxMedia } from "@/components/ui/lightbox"
-import { RecentMediaSkeleton } from "@/components/skeletons"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface RecentMediaItem {
     id: string
@@ -43,69 +43,102 @@ export function RecentMedia({ media, plinkLinks }: { media: RecentMediaItem[]; p
     const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
     const [plinkItems, setPlinkItems] = useState<UnifiedMediaItem[]>([])
     const [plinkLoading, setPlinkLoading] = useState(plinkLinks.length > 0)
+    const fetchingRef = useRef(false)
 
-    // Fetch plink media on mount
-    useEffect(() => {
-        if (plinkLinks.length === 0) return
+    const fetchPlinkMedia = useCallback(async (showLoading: boolean) => {
+        if (plinkLinks.length === 0 || fetchingRef.current) return
+        fetchingRef.current = true
+        if (showLoading) setPlinkLoading(true)
 
-        let cancelled = false
+        console.log('[RecentMedia] fetchPlinkMedia called', { showLoading, plinkLinksCount: plinkLinks.length })
 
-        async function fetchPlinkMedia() {
-            const now = Date.now()
-            const toFetch: PlinkLink[] = []
-            const fromCache: UnifiedMediaItem[] = []
+        const now = Date.now()
+        const toFetch: PlinkLink[] = []
+        const fromCache: UnifiedMediaItem[] = []
 
-            for (const link of plinkLinks) {
-                const cached = plinkMediaCache.get(link.plink_link_id)
-                if (cached && now - cached.fetchedAt < PLINK_CACHE_TTL) {
-                    fromCache.push(...normalizePlinkMedia(cached.data, link))
-                } else {
-                    toFetch.push(link)
-                }
+        for (const link of plinkLinks) {
+            const cached = plinkMediaCache.get(link.plink_link_id)
+            if (cached && now - cached.fetchedAt < PLINK_CACHE_TTL) {
+                const age = Math.round((now - cached.fetchedAt) / 1000)
+                console.log(`[RecentMedia] Cache HIT for ${link.plink_link_id} (age: ${age}s, items: ${cached.data.length})`)
+                fromCache.push(...normalizePlinkMedia(cached.data, link))
+            } else {
+                console.log(`[RecentMedia] Cache MISS for ${link.plink_link_id}`, cached ? `(expired, age: ${Math.round((now - cached.fetchedAt) / 1000)}s)` : '(no entry)')
+                toFetch.push(link)
             }
-
-            if (toFetch.length === 0) {
-                if (!cancelled) {
-                    setPlinkItems(fromCache)
-                    setPlinkLoading(false)
-                }
-                return
-            }
-
-            const results = await Promise.allSettled(
-                toFetch.map(async (link) => {
-                    const res = await fetch(`/api/plink/media/${link.plink_link_id}`)
-                    const data = await res.json()
-                    if (Array.isArray(data)) {
-                        plinkMediaCache.set(link.plink_link_id, { data, fetchedAt: Date.now() })
-                        return { link, data }
-                    }
-                    return { link, data: [] }
-                })
-            )
-
-            if (cancelled) return
-
-            const fetchedItems: UnifiedMediaItem[] = []
-            for (const result of results) {
-                if (result.status === 'fulfilled') {
-                    fetchedItems.push(...normalizePlinkMedia(result.value.data, result.value.link))
-                }
-            }
-
-            setPlinkItems([...fromCache, ...fetchedItems])
-            setPlinkLoading(false)
         }
 
-        fetchPlinkMedia()
+        if (toFetch.length === 0) {
+            console.log(`[RecentMedia] All from cache, ${fromCache.length} items total`)
+            setPlinkItems(fromCache)
+            setPlinkLoading(false)
+            fetchingRef.current = false
+            return
+        }
 
-        return () => { cancelled = true }
+        console.log(`[RecentMedia] Fetching ${toFetch.length} plink links...`)
+
+        const results = await Promise.allSettled(
+            toFetch.map(async (link) => {
+                const url = `/api/plink/media/${link.plink_link_id}`
+                console.log(`[RecentMedia] Fetching ${url}`)
+                const res = await fetch(url)
+                console.log(`[RecentMedia] Response for ${link.plink_link_id}: status=${res.status}`)
+                const data = await res.json()
+                if (Array.isArray(data)) {
+                    console.log(`[RecentMedia] Got ${data.length} media items for ${link.plink_link_id}`)
+                    plinkMediaCache.set(link.plink_link_id, { data, fetchedAt: Date.now() })
+                    return { link, data }
+                }
+                console.warn(`[RecentMedia] Unexpected response for ${link.plink_link_id}:`, data)
+                return { link, data: [] }
+            })
+        )
+
+        const fetchedItems: UnifiedMediaItem[] = []
+        for (const result of results) {
+            if (result.status === 'fulfilled') {
+                fetchedItems.push(...normalizePlinkMedia(result.value.data, result.value.link))
+            } else {
+                console.error(`[RecentMedia] Fetch failed:`, result.reason)
+            }
+        }
+
+        console.log(`[RecentMedia] Done. fromCache=${fromCache.length}, fetched=${fetchedItems.length}, total=${fromCache.length + fetchedItems.length}`)
+        setPlinkItems([...fromCache, ...fetchedItems])
+        setPlinkLoading(false)
+        fetchingRef.current = false
     }, [plinkLinks])
 
-    // Show skeleton while plink data is loading
-    if (plinkLoading) {
-        return <RecentMediaSkeleton />
-    }
+    // Fetch on mount
+    useEffect(() => {
+        fetchPlinkMedia(true)
+    }, [fetchPlinkMedia])
+
+    // Auto-refresh before presigned URLs expire
+    useEffect(() => {
+        if (plinkLinks.length === 0) return
+        console.log(`[RecentMedia] Setting up auto-refresh interval (${PLINK_CACHE_TTL / 1000}s)`)
+        const interval = setInterval(() => {
+            console.log('[RecentMedia] Auto-refresh triggered, invalidating cache')
+            for (const link of plinkLinks) {
+                plinkMediaCache.delete(link.plink_link_id)
+            }
+            fetchPlinkMedia(false)
+        }, PLINK_CACHE_TTL)
+        return () => clearInterval(interval)
+    }, [plinkLinks, fetchPlinkMedia])
+
+    // Re-fetch on image load error (handles edge case where URLs expired between intervals)
+    const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+        const src = e.currentTarget.src
+        console.warn(`[RecentMedia] Image load error, URL: ${src.substring(0, 80)}...`)
+        console.log('[RecentMedia] Invalidating cache and re-fetching')
+        for (const link of plinkLinks) {
+            plinkMediaCache.delete(link.plink_link_id)
+        }
+        fetchPlinkMedia(false)
+    }, [plinkLinks, fetchPlinkMedia])
 
     // Normalize local images into unified items
     const localItems: UnifiedMediaItem[] = media.map(item => ({
@@ -121,28 +154,12 @@ export function RecentMedia({ media, plinkLinks }: { media: RecentMediaItem[]; p
     // Merge, sort by date descending, take top 12
     const unified = [...localItems, ...plinkItems]
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        .slice(0, 12)
+        .slice(0, 32)
 
     const lightboxMedia: LightboxMedia[] = unified.map(item => ({
         url: item.fullUrl,
         type: item.type,
     }))
-
-    if (unified.length === 0) {
-        return (
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <ImageIcon className="h-5 w-5" />
-                        Recent Media
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-sm text-muted-foreground">No photos yet.</p>
-                </CardContent>
-            </Card>
-        )
-    }
 
     return (
         <>
@@ -154,41 +171,50 @@ export function RecentMedia({ media, plinkLinks }: { media: RecentMediaItem[]; p
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                        {unified.map((item, idx) => (
-                            <div
-                                key={`${item.source}-${item.id}`}
-                                className="relative group aspect-square rounded-lg overflow-hidden border border-zinc-800 cursor-pointer"
-                                onClick={() => setLightboxIndex(idx)}
-                            >
-                                {item.type === 'video' ? (
-                                    <>
+                    {!plinkLoading && unified.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No photos yet.</p>
+                    ) : (
+                        <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
+                            {unified.map((item, idx) => (
+                                <div
+                                    key={`${item.source}-${item.id}`}
+                                    className="relative group aspect-square rounded-lg overflow-hidden border border-zinc-800 cursor-pointer"
+                                    onClick={() => setLightboxIndex(idx)}
+                                >
+                                    {item.type === 'video' ? (
+                                        <>
+                                            <img
+                                                src={item.thumbnailUrl}
+                                                alt="Video"
+                                                className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                                                onError={item.source === 'plink' ? handleImageError : undefined}
+                                            />
+                                            <div className="absolute inset-0 z-10 flex items-center justify-center">
+                                                <div className="bg-black/60 rounded-full p-1.5">
+                                                    <Play className="h-4 w-4 text-white fill-white" />
+                                                </div>
+                                            </div>
+                                        </>
+                                    ) : (
                                         <img
                                             src={item.thumbnailUrl}
-                                            alt="Video"
+                                            alt="Photo"
                                             className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                                            onError={item.source === 'plink' ? handleImageError : undefined}
                                         />
-                                        <div className="absolute inset-0 flex items-center justify-center">
-                                            <div className="bg-black/60 rounded-full p-2">
-                                                <Play className="h-6 w-6 text-white fill-white" />
-                                            </div>
+                                    )}
+                                    {item.purpose && (
+                                        <div className="absolute inset-0 z-10 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
+                                            <span className="text-xs text-white line-clamp-2">{item.purpose}</span>
                                         </div>
-                                    </>
-                                ) : (
-                                    <img
-                                        src={item.thumbnailUrl}
-                                        alt="Photo"
-                                        className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                                    />
-                                )}
-                                {item.purpose && (
-                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
-                                        <span className="text-xs text-white line-clamp-2">{item.purpose}</span>
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
+                                    )}
+                                </div>
+                            ))}
+                            {plinkLoading && Array.from({ length: 8 }).map((_, i) => (
+                                <Skeleton key={`plink-skeleton-${i}`} className="aspect-square w-full rounded-lg" />
+                            ))}
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
