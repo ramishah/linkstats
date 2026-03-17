@@ -353,6 +353,13 @@ export function AllMedia({ linksWithMedia }: { linksWithMedia: LinkWithMedia[] }
                     currentIndex={lightboxIndex}
                     onClose={() => setLightboxIndex(null)}
                     onNavigate={setLightboxIndex}
+                    onMediaError={() => {
+                        setLightboxIndex(null)
+                        for (const link of plinkLinks) {
+                            plinkMediaCache.delete(link.plink_link_id!)
+                        }
+                        fetchPlinkMedia(false)
+                    }}
                 />
             )}
         </>
