@@ -260,41 +260,24 @@ export async function getLinksWithLocations(): Promise<FlattenedLinkLocation[]> 
     return flattened
 }
 
-export const getRecentMedia = cache(async function getRecentMedia(limit = 32) {
-    const { data, error } = await supabase
-        .from('link_images')
-        .select(`
-            id,
-            storage_path,
-            file_name,
-            created_at,
-            links (id, purpose, date)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(limit)
-
-    if (error) {
-        console.error('Error fetching recent media:', error)
-        return []
-    }
-
-    return data
-})
-
-export const getRecentPlinkLinks = cache(async function getRecentPlinkLinks(limit = 8) {
+export const getAllLinksWithMedia = cache(async function getAllLinksWithMedia() {
     const { data, error } = await supabase
         .from('links')
-        .select('id, date, purpose, plink_link_id')
-        .not('plink_link_id', 'is', null)
+        .select(`
+            id, date, purpose, plink_link_id,
+            link_images (id, storage_path, file_name, created_at)
+        `)
         .order('date', { ascending: false })
-        .limit(limit)
 
     if (error) {
-        console.error('Error fetching recent plink links:', error)
+        console.error('Error fetching links with media:', error)
         return []
     }
 
-    return data as { id: string; date: string; purpose: string | null; plink_link_id: string }[]
+    // Only return links that have local images or a plink connection
+    return (data || []).filter(
+        (link: any) => (link.link_images && link.link_images.length > 0) || link.plink_link_id
+    )
 })
 
 export const getSignificantLocations = cache(async function getSignificantLocations() {

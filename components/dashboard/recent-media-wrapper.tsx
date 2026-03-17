@@ -1,11 +1,8 @@
-import { getRecentMedia, getRecentPlinkLinks } from "@/lib/data"
-import { RecentMedia } from "@/components/dashboard/recent-media"
+import { getAllLinksWithMedia } from "@/lib/data"
+import { AllMedia } from "@/components/dashboard/recent-media"
 
-export async function RecentMediaWrapper() {
-    const [media, plinkLinks] = await Promise.all([
-        getRecentMedia(),
-        getRecentPlinkLinks(),
-    ])
+export async function AllMediaWrapper() {
+    const linksWithMedia = await getAllLinksWithMedia()
 
-    return <RecentMedia media={media as any} plinkLinks={plinkLinks} />
+    return <AllMedia linksWithMedia={linksWithMedia as any} />
 }

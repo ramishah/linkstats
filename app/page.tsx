@@ -6,7 +6,7 @@ import { FlopWallWrapper } from "@/components/dashboard/flop-wall-wrapper"
 import { MemberStatusWrapper } from "@/components/dashboard/member-status-wrapper"
 import { AddLinkDialogWrapper } from "@/components/dashboard/add-link-dialog-wrapper"
 import { LocationMapWrapper } from "@/components/dashboard/location-map-wrapper"
-import { RecentMediaWrapper } from "@/components/dashboard/recent-media-wrapper"
+import { AllMediaWrapper } from "@/components/dashboard/recent-media-wrapper"
 import {
   StatsCardsSkeleton,
   OverviewSkeleton,
@@ -15,7 +15,7 @@ import {
   RecentLinksSkeleton,
   AddLinkButtonSkeleton,
   MapSkeleton,
-  RecentMediaSkeleton
+  AllMediaSkeleton
 } from "@/components/skeletons"
 
 export const revalidate = 0; // Ensure fresh data on every load
@@ -41,8 +41,8 @@ export default function Home() {
         <LocationMapWrapper />
       </Suspense>
 
-      <Suspense fallback={<RecentMediaSkeleton />}>
-        <RecentMediaWrapper />
+      <Suspense fallback={<AllMediaSkeleton />}>
+        <AllMediaWrapper />
       </Suspense>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
