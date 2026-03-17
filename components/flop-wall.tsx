@@ -50,7 +50,7 @@ export function FlopWall({ friends, allFlops }: { friends: any[], allFlops: Unif
                                         )}
                                     </div>
                                     <span className="text-xs text-muted-foreground">
-                                        {item.flop_date ? new Date(item.flop_date).toLocaleDateString() : 'Unknown date'}
+                                        {item.flop_date ? new Date(item.flop_date + 'T00:00:00').toLocaleDateString('en-US') : 'Unknown date'}
                                     </span>
                                 </div>
                                 <p className="text-sm font-medium">

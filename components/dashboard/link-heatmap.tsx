@@ -66,7 +66,8 @@ export function LinkHeatmap({ linkDates }: LinkHeatmapProps) {
                 </Select>
             </CardHeader>
             <CardContent>
-                <div className="flex gap-4 overflow-x-auto pb-2 lg:justify-between lg:gap-0 lg:overflow-visible lg:pb-0">
+                <div className="overflow-x-auto pb-2">
+                    <div className="flex gap-4" style={{ minWidth: "1100px" }}>
                     {Array.from({ length: 12 }, (_, mo) => {
                         const daysInMonth = new Date(yearNum, mo + 1, 0).getDate()
                         const firstDayJs = new Date(yearNum, mo, 1).getDay()
@@ -81,7 +82,7 @@ export function LinkHeatmap({ linkDates }: LinkHeatmapProps) {
                         }
 
                         return (
-                            <div key={mo} className={`shrink-0 ${isFutureMonth ? "opacity-30" : ""}`}>
+                            <div key={mo} className={isFutureMonth ? "opacity-30" : ""}>
                                 <p className="text-xs text-muted-foreground mb-1">{MONTH_NAMES[mo]}</p>
                                 <div className="grid grid-cols-7 gap-[6px]">
                                     {DAY_LABELS.map((dl, i) => (
@@ -109,6 +110,7 @@ export function LinkHeatmap({ linkDates }: LinkHeatmapProps) {
                             </div>
                         )
                     })}
+                    </div>
                 </div>
             </CardContent>
         </Card>
