@@ -7,6 +7,7 @@ import { MemberStatusWrapper } from "@/components/dashboard/member-status-wrappe
 import { AddLinkDialogWrapper } from "@/components/dashboard/add-link-dialog-wrapper"
 import { LocationMapWrapper } from "@/components/dashboard/location-map-wrapper"
 import { AllMediaWrapper } from "@/components/dashboard/recent-media-wrapper"
+import { LinkHeatmapWrapper } from "@/components/dashboard/link-heatmap-wrapper"
 import {
   StatsCardsSkeleton,
   OverviewSkeleton,
@@ -15,7 +16,8 @@ import {
   RecentLinksSkeleton,
   AddLinkButtonSkeleton,
   MapSkeleton,
-  AllMediaSkeleton
+  AllMediaSkeleton,
+  HeatmapSkeleton
 } from "@/components/skeletons"
 
 export const revalidate = 0; // Ensure fresh data on every load
@@ -35,6 +37,10 @@ export default function Home() {
 
       <Suspense fallback={<StatsCardsSkeleton />}>
         <StatsCards />
+      </Suspense>
+
+      <Suspense fallback={<HeatmapSkeleton />}>
+        <LinkHeatmapWrapper />
       </Suspense>
 
       <Suspense fallback={<MapSkeleton />}>
@@ -68,6 +74,7 @@ export default function Home() {
           <RecentLinksList />
         </Suspense>
       </div>
+
     </div>
   );
 }

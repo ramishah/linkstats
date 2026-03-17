@@ -137,6 +137,23 @@ export function AllMediaSkeleton() {
     )
 }
 
+export function HeatmapSkeleton() {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle><Skeleton className="h-6 w-[120px]" /></CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="flex gap-6">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                        <Skeleton key={i} className="shrink-0 w-28 h-20 rounded" />
+                    ))}
+                </div>
+            </CardContent>
+        </Card>
+    )
+}
+
 export function MapSkeleton() {
     return (
         <Card className="h-full">

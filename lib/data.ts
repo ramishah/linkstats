@@ -3,6 +3,19 @@ import { supabase } from './supabase'
 import { FlattenedLinkLocation, UnifiedFlop } from './types'
 
 // Wrap data fetching functions with React cache() to deduplicate calls within a request
+export const getLinkDates = cache(async function getLinkDates() {
+    const { data, error } = await supabase
+        .from('links')
+        .select('date')
+        .order('date', { ascending: true })
+
+    if (error) {
+        console.error('Error fetching link dates:', error)
+        return []
+    }
+    return (data || []).map((d: { date: string }) => d.date)
+})
+
 export const getFriends = cache(async function getFriends() {
     const { data, error } = await supabase
         .from('profiles')
