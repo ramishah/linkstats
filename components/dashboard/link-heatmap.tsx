@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
@@ -19,6 +19,9 @@ function toLocalDateStr(date: Date): string {
 }
 
 export function LinkHeatmap({ linkDates }: LinkHeatmapProps) {
+    const [mounted, setMounted] = useState(false)
+    useEffect(() => setMounted(true), [])
+
     // Convert UTC timestamps to local date strings
     const dateSet = new Set(linkDates.map((d) => toLocalDateStr(new Date(d))))
 
@@ -33,6 +36,19 @@ export function LinkHeatmap({ linkDates }: LinkHeatmapProps) {
 
     const yearNum = parseInt(selectedYear)
     const todayStr = toLocalDateStr(now)
+
+    if (!mounted) {
+        return (
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle>Link Activity</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="h-[120px]" />
+                </CardContent>
+            </Card>
+        )
+    }
 
     return (
         <Card>
