@@ -12,7 +12,7 @@ interface PlinkLink {
     created_at: string
 }
 
-export function ConnectPlinkDialog({ link }: { link: any }) {
+export function ConnectPlinkDialog({ link, connectedPlinkIds = new Map() }: { link: any, connectedPlinkIds?: Map<string, string> }) {
     const [open, setOpen] = useState(false)
     const [plinkLinks, setPlinkLinks] = useState<PlinkLink[]>([])
     const [loading, setLoading] = useState(false)
@@ -82,22 +82,32 @@ export function ConnectPlinkDialog({ link }: { link: any }) {
                             <p className="text-sm text-muted-foreground">No plink links found.</p>
                         ) : (
                             <div className="max-h-[300px] overflow-y-auto space-y-1">
-                                {plinkLinks.map((pl) => (
-                                    <button
-                                        key={pl.id}
-                                        className={`w-full text-left p-3 rounded-lg transition-colors ${
-                                            selectedId === pl.id
-                                                ? "bg-blue-500/20 border border-blue-500/40"
-                                                : "bg-zinc-900/50 border border-zinc-800 hover:bg-zinc-800/50"
-                                        }`}
-                                        onClick={() => setSelectedId(pl.id)}
-                                    >
-                                        <div className="font-medium text-sm">{pl.name}</div>
-                                        <div className="text-xs text-muted-foreground">
-                                            {new Date(pl.created_at).toLocaleDateString()}
-                                        </div>
-                                    </button>
-                                ))}
+                                {plinkLinks.map((pl) => {
+                                    const connectedToLinkId = connectedPlinkIds.get(pl.id)
+                                    const isUsedByOther = !!connectedToLinkId && connectedToLinkId !== link.id
+                                    return (
+                                        <button
+                                            key={pl.id}
+                                            disabled={isUsedByOther}
+                                            className={`w-full text-left p-3 rounded-lg transition-colors ${
+                                                isUsedByOther
+                                                    ? "bg-zinc-900/30 border border-zinc-800/50 opacity-50 cursor-not-allowed"
+                                                    : selectedId === pl.id
+                                                        ? "bg-blue-500/20 border border-blue-500/40"
+                                                        : "bg-zinc-900/50 border border-zinc-800 hover:bg-zinc-800/50"
+                                            }`}
+                                            onClick={() => !isUsedByOther && setSelectedId(pl.id)}
+                                        >
+                                            <div className="font-medium text-sm">{pl.name}</div>
+                                            <div className="text-xs text-muted-foreground">
+                                                {isUsedByOther
+                                                    ? "Already connected to another link"
+                                                    : new Date(pl.created_at).toLocaleDateString()
+                                                }
+                                            </div>
+                                        </button>
+                                    )
+                                })}
                             </div>
                         )}
 

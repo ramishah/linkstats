@@ -22,6 +22,11 @@ import { formatAddress } from '@/lib/utils'
 export function HistoryTable({ links, friends, significantLocations = [] }: { links: any[], friends: any[], significantLocations?: any[] }) {
     const [selectedLink, setSelectedLink] = useState<any>(null)
 
+    // Map of plink_link_id -> link id for all links that have a plink connection
+    const connectedPlinkIds = new Map<string, string>(
+        links.filter(l => l.plink_link_id).map(l => [l.plink_link_id, l.id])
+    )
+
     return (
         <div className="rounded-md border">
             <Table>
@@ -122,7 +127,7 @@ export function HistoryTable({ links, friends, significantLocations = [] }: { li
                                     </TableCell>
                                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                         <div className="flex justify-end gap-1">
-                                            <ConnectPlinkDialog link={link} />
+                                            <ConnectPlinkDialog link={link} connectedPlinkIds={connectedPlinkIds} />
                                             <RateLinkDialog link={link} friends={friends} />
                                             <EditLinkDialog link={link} friends={friends} significantLocations={significantLocations} />
                                             <Button

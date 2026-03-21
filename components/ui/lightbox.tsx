@@ -85,7 +85,7 @@ export function Lightbox({ media, currentIndex, onClose, onNavigate, onMediaErro
 
             {media[currentIndex].type === 'video' ? (
                 <video
-                    key={currentIndex}
+                    key={media[currentIndex].url}
                     src={media[currentIndex].url}
                     controls
                     autoPlay
@@ -93,7 +93,7 @@ export function Lightbox({ media, currentIndex, onClose, onNavigate, onMediaErro
                     onCanPlay={() => setLoading(false)}
                     onError={() => {
                         console.error('[Lightbox] Video load error:', media[currentIndex].url.substring(0, 80))
-                        setLoading(false)
+                        setLoading(true)
                         onMediaError?.()
                     }}
                 />
@@ -105,7 +105,7 @@ export function Lightbox({ media, currentIndex, onClose, onNavigate, onMediaErro
                     onLoad={() => setLoading(false)}
                     onError={() => {
                         console.error('[Lightbox] Image load error:', media[currentIndex].url.substring(0, 80))
-                        setLoading(false)
+                        setLoading(true)
                         onMediaError?.()
                     }}
                 />
