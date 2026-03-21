@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
-import { ImageIcon, Play, Video } from "lucide-react"
+import { ImageIcon, Play, Video, ChevronLeft, ChevronRight } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -43,6 +43,7 @@ interface TimelineGroup {
 // Client-side cache for plink media
 const plinkMediaCache = new Map<string, { data: any[]; fetchedAt: number }>()
 const PLINK_CACHE_TTL = 10 * 60 * 1000
+const LINKS_PER_PAGE = 5
 
 function getImageUrl(storagePath: string) {
     return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/link-images/${storagePath}`
@@ -69,99 +70,13 @@ export function AllMedia({ linksWithMedia }: { linksWithMedia: LinkWithMedia[] }
     const [typeFilter, setTypeFilter] = useState<'all' | 'image' | 'video'>('all')
     const [linkFilter, setLinkFilter] = useState<string | null>(null)
     const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+    const [currentPage, setCurrentPage] = useState(0)
     const fetchingRef = useRef(false)
 
-    // Identify plink-connected links
-    const plinkLinks = useMemo(
-        () => linksWithMedia.filter(l => l.plink_link_id),
-        [linksWithMedia]
-    )
-
-    const fetchPlinkMedia = useCallback(async (showLoading: boolean) => {
-        if (plinkLinks.length === 0 || fetchingRef.current) return
-        fetchingRef.current = true
-        if (showLoading) setPlinkLoading(true)
-
-        console.log('[AllMedia] fetchPlinkMedia called', { showLoading, count: plinkLinks.length })
-
-        const now = Date.now()
-        const toFetch: LinkWithMedia[] = []
-        const fromCache: Record<string, UnifiedMediaItem[]> = {}
-
-        for (const link of plinkLinks) {
-            const cached = plinkMediaCache.get(link.plink_link_id!)
-            if (cached && now - cached.fetchedAt < PLINK_CACHE_TTL) {
-                fromCache[link.id] = normalizePlinkMedia(cached.data, link.id)
-            } else {
-                toFetch.push(link)
-            }
-        }
-
-        if (toFetch.length === 0) {
-            setPlinkMediaByLink(fromCache)
-            setPlinkLoading(false)
-            fetchingRef.current = false
-            return
-        }
-
-        console.log(`[AllMedia] Fetching ${toFetch.length} plink links...`)
-
-        const results = await Promise.allSettled(
-            toFetch.map(async (link) => {
-                const res = await fetch(`/api/plink/media/${link.plink_link_id}`)
-                console.log(`[AllMedia] Response for ${link.plink_link_id}: status=${res.status}`)
-                const data = await res.json()
-                if (Array.isArray(data)) {
-                    plinkMediaCache.set(link.plink_link_id!, { data, fetchedAt: Date.now() })
-                    return { linkId: link.id, data }
-                }
-                console.warn(`[AllMedia] Unexpected response for ${link.plink_link_id}:`, data)
-                return { linkId: link.id, data: [] }
-            })
-        )
-
-        const fetched: Record<string, UnifiedMediaItem[]> = { ...fromCache }
-        for (const result of results) {
-            if (result.status === 'fulfilled') {
-                fetched[result.value.linkId] = normalizePlinkMedia(result.value.data, result.value.linkId)
-            } else {
-                console.error(`[AllMedia] Fetch failed:`, result.reason)
-            }
-        }
-
-        setPlinkMediaByLink(fetched)
-        setPlinkLoading(false)
-        fetchingRef.current = false
-    }, [plinkLinks])
-
-    // Fetch on mount
+    // Reset page when filters change
     useEffect(() => {
-        if (plinkLinks.length > 0) {
-            setPlinkLoading(true)
-            fetchPlinkMedia(true)
-        }
-    }, [fetchPlinkMedia, plinkLinks.length])
-
-    // Auto-refresh before presigned URLs expire
-    useEffect(() => {
-        if (plinkLinks.length === 0) return
-        const interval = setInterval(() => {
-            console.log('[AllMedia] Auto-refresh triggered')
-            for (const link of plinkLinks) {
-                plinkMediaCache.delete(link.plink_link_id!)
-            }
-            fetchPlinkMedia(false)
-        }, PLINK_CACHE_TTL)
-        return () => clearInterval(interval)
-    }, [plinkLinks, fetchPlinkMedia])
-
-    const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
-        console.warn(`[AllMedia] Image load error: ${e.currentTarget.src.substring(0, 80)}...`)
-        for (const link of plinkLinks) {
-            plinkMediaCache.delete(link.plink_link_id!)
-        }
-        fetchPlinkMedia(false)
-    }, [plinkLinks, fetchPlinkMedia])
+        setCurrentPage(0)
+    }, [typeFilter, linkFilter])
 
     // Build timeline groups
     const allGroups: TimelineGroup[] = useMemo(() => {
@@ -197,24 +112,137 @@ export function AllMedia({ linksWithMedia }: { linksWithMedia: LinkWithMedia[] }
                 .map(g => ({ ...g, media: g.media.filter(m => m.type === typeFilter) }))
                 .filter(g => g.media.length > 0)
         } else {
-            // Still filter out groups with no media (unless plink is loading and they have a plink connection)
+            // Keep groups that have media OR have a plink connection (media may still be loading)
             groups = groups.filter(g => {
                 if (g.media.length > 0) return true
-                if (plinkLoading) {
-                    const link = linksWithMedia.find(l => l.id === g.linkId)
-                    return !!link?.plink_link_id
-                }
-                return false
+                const link = linksWithMedia.find(l => l.id === g.linkId)
+                return !!link?.plink_link_id
             })
         }
 
         return groups
     }, [allGroups, typeFilter, linkFilter, plinkLoading, linksWithMedia])
 
-    // Flat media array for lightbox
+    // Pagination
+    const totalPages = Math.max(1, Math.ceil(filteredGroups.length / LINKS_PER_PAGE))
+
+    const paginatedGroups = useMemo(() => {
+        if (linkFilter) return filteredGroups
+        const start = currentPage * LINKS_PER_PAGE
+        return filteredGroups.slice(start, start + LINKS_PER_PAGE)
+    }, [filteredGroups, currentPage, linkFilter])
+
+    const showPagination = !linkFilter && totalPages > 1
+
+    // Plink link IDs on the current page — stable string key to avoid effect loops
+    const currentPagePlinkIds = useMemo(() => {
+        const ids = paginatedGroups
+            .map(g => linksWithMedia.find(l => l.id === g.linkId))
+            .filter((l): l is LinkWithMedia => !!l?.plink_link_id)
+            .map(l => l.plink_link_id!)
+        return ids
+    }, [paginatedGroups, linksWithMedia])
+
+    const plinkIdsKey = currentPagePlinkIds.join(',')
+
+    const fetchPlinkMedia = useCallback(async (links: LinkWithMedia[], showLoading: boolean) => {
+        if (links.length === 0 || fetchingRef.current) return
+        fetchingRef.current = true
+        if (showLoading) setPlinkLoading(true)
+
+        const now = Date.now()
+        const toFetch: LinkWithMedia[] = []
+        const fromCache: Record<string, UnifiedMediaItem[]> = {}
+
+        for (const link of links) {
+            const cached = plinkMediaCache.get(link.plink_link_id!)
+            if (cached && now - cached.fetchedAt < PLINK_CACHE_TTL) {
+                fromCache[link.id] = normalizePlinkMedia(cached.data, link.id)
+            } else {
+                toFetch.push(link)
+            }
+        }
+
+        if (toFetch.length === 0) {
+            setPlinkLoading(false)
+            fetchingRef.current = false
+            return
+        }
+
+        const results = await Promise.allSettled(
+            toFetch.map(async (link) => {
+                const res = await fetch(`/api/plink/media/${link.plink_link_id}`)
+                const data = await res.json()
+                if (Array.isArray(data)) {
+                    plinkMediaCache.set(link.plink_link_id!, { data, fetchedAt: Date.now() })
+                    return { linkId: link.id, data }
+                }
+                return { linkId: link.id, data: [] }
+            })
+        )
+
+        const fetched: Record<string, UnifiedMediaItem[]> = { ...fromCache }
+        for (const result of results) {
+            if (result.status === 'fulfilled') {
+                fetched[result.value.linkId] = normalizePlinkMedia(result.value.data, result.value.linkId)
+            }
+        }
+
+        setPlinkMediaByLink(prev => ({ ...prev, ...fetched }))
+        setPlinkLoading(false)
+        fetchingRef.current = false
+    }, [])
+
+    // Fetch plink media when current page's plink links change
+    useEffect(() => {
+        if (!plinkIdsKey) return
+        const links = linksWithMedia.filter(l => l.plink_link_id && currentPagePlinkIds.includes(l.plink_link_id))
+        if (links.length === 0) return
+
+        const now = Date.now()
+        const hasUncached = links.some(l => {
+            const cached = plinkMediaCache.get(l.plink_link_id!)
+            return !cached || now - cached.fetchedAt >= PLINK_CACHE_TTL
+        })
+        if (hasUncached) {
+            setPlinkLoading(true)
+            fetchPlinkMedia(links, true)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [plinkIdsKey])
+
+    // Keep a ref to current page plink links for use in callbacks without causing re-renders
+    const currentPagePlinkLinksRef = useRef<LinkWithMedia[]>([])
+    currentPagePlinkLinksRef.current = useMemo(
+        () => linksWithMedia.filter(l => l.plink_link_id && currentPagePlinkIds.includes(l.plink_link_id)),
+        [linksWithMedia, currentPagePlinkIds]
+    )
+
+    // Auto-refresh before presigned URLs expire (only current page)
+    useEffect(() => {
+        if (!plinkIdsKey) return
+        const interval = setInterval(() => {
+            const links = currentPagePlinkLinksRef.current
+            for (const link of links) {
+                plinkMediaCache.delete(link.plink_link_id!)
+            }
+            fetchPlinkMedia(links, false)
+        }, PLINK_CACHE_TTL)
+        return () => clearInterval(interval)
+    }, [plinkIdsKey, fetchPlinkMedia])
+
+    const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+        const links = currentPagePlinkLinksRef.current
+        for (const link of links) {
+            plinkMediaCache.delete(link.plink_link_id!)
+        }
+        fetchPlinkMedia(links, false)
+    }, [fetchPlinkMedia])
+
+    // Flat media array for lightbox (from paginated groups only)
     const allVisibleMedia = useMemo(
-        () => filteredGroups.flatMap(g => g.media),
-        [filteredGroups]
+        () => paginatedGroups.flatMap(g => g.media),
+        [paginatedGroups]
     )
 
     const lightboxMedia: LightboxMedia[] = useMemo(
@@ -226,7 +254,7 @@ export function AllMedia({ linksWithMedia }: { linksWithMedia: LinkWithMedia[] }
     function getGlobalIndex(groupIdx: number, mediaIdx: number): number {
         let offset = 0
         for (let i = 0; i < groupIdx; i++) {
-            offset += filteredGroups[i].media.length
+            offset += paginatedGroups[i].media.length
         }
         return offset + mediaIdx
     }
@@ -288,7 +316,7 @@ export function AllMedia({ linksWithMedia }: { linksWithMedia: LinkWithMedia[] }
                 </CardHeader>
                 <CardContent>
                     <div className="overflow-y-auto max-h-[450px] space-y-4 pr-1">
-                        {filteredGroups.map((group, groupIdx) => (
+                        {paginatedGroups.map((group, groupIdx) => (
                             <div key={group.linkId}>
                                 <div className="flex items-center gap-2 mb-1.5">
                                     <span className="text-sm font-medium truncate">
@@ -340,10 +368,37 @@ export function AllMedia({ linksWithMedia }: { linksWithMedia: LinkWithMedia[] }
                                 </div>
                             </div>
                         ))}
-                        {!plinkLoading && filteredGroups.length === 0 && (
+                        {!plinkLoading && paginatedGroups.length === 0 && (
                             <p className="text-sm text-muted-foreground py-4 text-center">No media found.</p>
                         )}
                     </div>
+                    {showPagination && (
+                        <div className="flex items-center justify-between pt-3 border-t border-zinc-800 mt-3">
+                            <span className="text-xs text-muted-foreground">
+                                Page {currentPage + 1} of {totalPages}
+                            </span>
+                            <div className="flex items-center gap-1">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 w-7 p-0"
+                                    disabled={currentPage === 0}
+                                    onClick={() => setCurrentPage(p => p - 1)}
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 w-7 p-0"
+                                    disabled={currentPage >= totalPages - 1}
+                                    onClick={() => setCurrentPage(p => p + 1)}
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
@@ -354,10 +409,11 @@ export function AllMedia({ linksWithMedia }: { linksWithMedia: LinkWithMedia[] }
                     onClose={() => setLightboxIndex(null)}
                     onNavigate={setLightboxIndex}
                     onMediaError={() => {
-                        for (const link of plinkLinks) {
+                        const links = currentPagePlinkLinksRef.current
+                        for (const link of links) {
                             plinkMediaCache.delete(link.plink_link_id!)
                         }
-                        fetchPlinkMedia(false)
+                        fetchPlinkMedia(links, false)
                     }}
                 />
             )}
