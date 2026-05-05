@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getPlinkSession, getAuthenticatedPlinkClient, plinkMediaServiceUrl } from '@/lib/plink'
+import { getPlinkSession, getAuthenticatedPlinkClient, fetchSignedUrlsBatch } from '@/lib/plink'
 
 export async function GET() {
     const results: Record<string, { pass: boolean; data?: any; error?: string }> = {}
@@ -32,41 +32,37 @@ export async function GET() {
         return NextResponse.json(results)
     }
 
-    // Step 3: Query link_posts + link_post_media
+    // Step 3: Query link_media
     let firstMediaPath: string | null = null
     try {
         if (!firstLinkId) throw new Error('No links found to test with')
 
         const client = getAuthenticatedPlinkClient()
         const { data, error } = await client
-            .from('link_posts')
-            .select('id, link_id, link_post_media(id, type, path, thumbnail_path, mime)')
+            .from('link_media')
+            .select('id, link_id, type, path, thumbnail_path, mime')
             .eq('link_id', firstLinkId)
             .limit(5)
 
         if (error) throw new Error(error.message)
 
-        const allMedia = data?.flatMap(p => p.link_post_media) ?? []
-        firstMediaPath = allMedia[0]?.path ?? null
-        results['3_media_query'] = { pass: true, data: { postCount: data?.length, mediaCount: allMedia.length, firstMedia: allMedia[0] } }
+        firstMediaPath = data?.[0]?.path ?? null
+        results['3_media_query'] = { pass: true, data: { mediaCount: data?.length, firstMedia: data?.[0] } }
     } catch (e: any) {
         results['3_media_query'] = { pass: false, error: e.message }
         return NextResponse.json(results)
     }
 
-    // Step 4: Get presigned URL from media service
+    // Step 4: Get presigned URL via batch endpoint (link-scoped auth)
     let presignedUrl: string | null = null
     try {
         if (!firstMediaPath) throw new Error('No media found to test with')
+        if (!firstLinkId) throw new Error('No link id available')
 
-        const res = await fetch(`${plinkMediaServiceUrl}/media/url/${firstMediaPath}`, {
-            headers: { Authorization: `Bearer ${accessToken}` },
-        })
-
-        if (!res.ok) throw new Error(`Media service returned ${res.status}: ${await res.text()}`)
-        const json = await res.json()
-        presignedUrl = json.url ?? json.signedUrl ?? null
-        results['4_media_service'] = { pass: true, data: { urlPreview: presignedUrl?.substring(0, 100) + '...' } }
+        const urls = await fetchSignedUrlsBatch(firstLinkId, [firstMediaPath], accessToken)
+        presignedUrl = urls[firstMediaPath] ?? null
+        if (!presignedUrl) throw new Error('Batch endpoint returned no URL for media path')
+        results['4_media_service'] = { pass: true, data: { urlPreview: presignedUrl.substring(0, 100) + '...' } }
     } catch (e: any) {
         results['4_media_service'] = { pass: false, error: e.message }
         return NextResponse.json(results)

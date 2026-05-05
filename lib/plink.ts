@@ -59,3 +59,38 @@ export function getAuthenticatedPlinkClient() {
         },
     })
 }
+
+// Batch endpoint expects keys all under links/{linkId}/ and returns { urls: { [key]: url } }.
+// Service caps each call at 100 keys.
+export async function fetchSignedUrlsBatch(
+    linkId: string,
+    keys: string[],
+    accessToken: string,
+): Promise<Record<string, string>> {
+    if (keys.length === 0) return {}
+
+    const result: Record<string, string> = {}
+    const BATCH_SIZE = 100
+
+    for (let i = 0; i < keys.length; i += BATCH_SIZE) {
+        const chunk = keys.slice(i, i + BATCH_SIZE)
+        const res = await fetch(`${plinkMediaServiceUrl}/media/urls`, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ linkId, keys: chunk }),
+        })
+
+        if (!res.ok) {
+            const body = await res.text().catch(() => '')
+            throw new Error(`Batch signed URL request failed: ${res.status} ${body}`)
+        }
+
+        const json = await res.json()
+        Object.assign(result, json.urls ?? {})
+    }
+
+    return result
+}

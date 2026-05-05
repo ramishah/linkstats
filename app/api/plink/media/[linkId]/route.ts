@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getPlinkSession, getAuthenticatedPlinkClient, plinkMediaServiceUrl } from '@/lib/plink'
+import { getPlinkSession, getAuthenticatedPlinkClient, fetchSignedUrlsBatch } from '@/lib/plink'
 
 export async function GET(
     request: Request,
@@ -10,53 +10,31 @@ export async function GET(
         const accessToken = await getPlinkSession()
         const client = getAuthenticatedPlinkClient()
 
-        // Fetch posts and their media for this link
-        const { data: posts, error } = await client
-            .from('link_posts')
-            .select('id, link_post_media(id, type, path, thumbnail_path, mime)')
+        const { data: media, error } = await client
+            .from('link_media')
+            .select('id, type, path, thumbnail_path, mime')
             .eq('link_id', linkId)
+            .order('captured_at', { ascending: true, nullsFirst: false })
+            .order('created_at', { ascending: true })
 
         if (error) throw new Error(error.message)
+        if (!media || media.length === 0) return NextResponse.json([])
 
-        const allMedia = posts?.flatMap(p => p.link_post_media) ?? []
+        const keys: string[] = []
+        for (const item of media) {
+            if (item.path) keys.push(item.path)
+            if (item.thumbnail_path) keys.push(item.thumbnail_path)
+        }
 
-        // Get presigned URLs for each media item
-        const mediaWithUrls = await Promise.all(
-            allMedia.map(async (item: any) => {
-                let url: string | null = null
-                let thumbnailUrl: string | null = null
+        const urls = await fetchSignedUrlsBatch(linkId, keys, accessToken)
 
-                try {
-                    const res = await fetch(`${plinkMediaServiceUrl}/media/url/${item.path}`, {
-                        headers: { Authorization: `Bearer ${accessToken}` },
-                    })
-                    if (res.ok) {
-                        const json = await res.json()
-                        url = json.url ?? json.signedUrl ?? null
-                    }
-                } catch {}
-
-                if (item.thumbnail_path) {
-                    try {
-                        const res = await fetch(`${plinkMediaServiceUrl}/media/url/${item.thumbnail_path}`, {
-                            headers: { Authorization: `Bearer ${accessToken}` },
-                        })
-                        if (res.ok) {
-                            const json = await res.json()
-                            thumbnailUrl = json.url ?? json.signedUrl ?? null
-                        }
-                    } catch {}
-                }
-
-                return {
-                    id: item.id,
-                    type: item.type,
-                    url,
-                    thumbnailUrl,
-                    mime: item.mime,
-                }
-            })
-        )
+        const mediaWithUrls = media.map(item => ({
+            id: item.id,
+            type: item.type,
+            url: urls[item.path] ?? null,
+            thumbnailUrl: item.thumbnail_path ? (urls[item.thumbnail_path] ?? null) : null,
+            mime: item.mime,
+        }))
 
         return NextResponse.json(mediaWithUrls.filter(m => m.url))
     } catch (e: any) {
