@@ -1,5 +1,5 @@
 import { getLinksWithLocations, getSignificantLocations } from "@/lib/data"
-import { LocationMap } from "@/components/dashboard/location-map"
+import { LocationMap } from "@/components/dashboard/location-map-client"
 
 export async function LocationMapWrapper() {
     const links = await getLinksWithLocations()

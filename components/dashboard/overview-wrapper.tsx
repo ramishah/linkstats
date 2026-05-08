@@ -1,5 +1,5 @@
 import { getDashboardStats } from "@/lib/data"
-import { Overview } from "@/components/overview"
+import { Overview } from "@/components/dashboard/overview-client"
 
 export async function OverviewWrapper({ className }: { className?: string }) {
     const stats = await getDashboardStats()

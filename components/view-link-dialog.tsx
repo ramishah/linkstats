@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import dynamic from "next/dynamic"
 import { Star, MapPin, Clock, Users, Plus, X, ImageIcon, Pencil, Play, Loader2 } from "lucide-react"
 import { Lightbox } from "@/components/ui/lightbox"
 import { Dialog, DialogContent, DialogTitle, DialogHeader } from "@/components/ui/dialog"
@@ -8,8 +9,16 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Map as MapComponent, MapMarker, MarkerContent, MarkerPopup, MarkerTooltip, MapControls } from "@/components/ui/map"
+import { Skeleton } from "@/components/ui/skeleton"
 import { formatAddress } from "@/lib/utils"
+
+const ViewLinkDialogMap = dynamic(
+    () => import("@/components/view-link-dialog-map").then(m => m.ViewLinkDialogMap),
+    {
+        ssr: false,
+        loading: () => <Skeleton className="h-[250px] w-full rounded-lg" />,
+    }
+)
 import { supabase } from "@/lib/supabase"
 import { saveLinkImage, deleteLinkImage, createSignificantLocation, updateSignificantLocation, createLinkReview, deleteLinkReview } from "@/lib/actions"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -329,54 +338,11 @@ export function ViewLinkDialog({ link, friends = [], significantLocations = [], 
                     <div className="space-y-6 pt-4">
                         {/* Map */}
                         {hasLocations && (
-                            <div className="h-[250px] rounded-lg overflow-hidden outline-none [&_canvas]:outline-none">
-                                <MapComponent
-                                    center={[centerLng, centerLat]}
-                                    zoom={13}
-                                    styles={{
-                                        dark: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
-                                        light: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-                                    }}
-                                >
-                                    <MapControls position="bottom-right" showZoom={true} />
-                                    {locations.map((loc: any, i: number) => {
-                                        const label = loc.location_label
-                                            || localSignificantLocations?.find((sl: any) => sl.address === loc.location_name)?.label
-                                        return (
-                                            <MapMarker
-                                                key={i}
-                                                longitude={loc.location_lng}
-                                                latitude={loc.location_lat}
-                                            >
-                                                <MarkerContent>
-                                                    <div className="size-4 rounded-full bg-primary border-2 border-white shadow-lg" />
-                                                </MarkerContent>
-                                                <MarkerTooltip>
-                                                    {label ? (
-                                                        <Badge variant="outline" className="bg-background text-foreground border-foreground/20">
-                                                            {label}
-                                                        </Badge>
-                                                    ) : (
-                                                        formatAddress(loc.location_name)
-                                                    )}
-                                                </MarkerTooltip>
-                                                <MarkerPopup>
-                                                    <div className="space-y-1 max-w-[250px]">
-                                                        {label ? (
-                                                            <Badge variant="outline" className="bg-background text-foreground border-foreground/20">
-                                                                {label}
-                                                            </Badge>
-                                                        ) : null}
-                                                        <p className="text-xs text-muted-foreground break-words">
-                                                            {formatAddress(loc.location_name)}
-                                                        </p>
-                                                    </div>
-                                                </MarkerPopup>
-                                            </MapMarker>
-                                        )
-                                    })}
-                                </MapComponent>
-                            </div>
+                            <ViewLinkDialogMap
+                                center={[centerLng, centerLat]}
+                                locations={locations}
+                                significantLocations={localSignificantLocations}
+                            />
                         )}
 
                         {/* Photos Section */}
